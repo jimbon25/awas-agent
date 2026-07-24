@@ -2,12 +2,12 @@
 
 ![AWAS AGENT Banner](screenshots/banner.svg)
 
-[![NPM Version](https://img.shields.io/npm/v/awas-ai?color=cb3837&style=for-the-badge)](https://www.npmjs.com/package/awas-ai)
-[![NPM Downloads](https://img.shields.io/npm/dm/awas-ai?color=007ec6&style=for-the-badge)](https://www.npmjs.com/package/awas-ai)
+[![NPM Version](https://img.shields.io/npm/v/awas-agent?color=cb3837&style=for-the-badge)](https://www.npmjs.com/package/awas-agent)
+[![NPM Downloads](https://img.shields.io/npm/dm/awas-agent?color=007ec6&style=for-the-badge)](https://www.npmjs.com/package/awas-agent)
 [![Go Version](https://img.shields.io/badge/Go-1.22%2B-00ADD8?style=for-the-badge&logo=go)](https://go.dev)
 [![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=for-the-badge)](#os-specific-configuration-directory-paths)
 [![Gateways](https://img.shields.io/badge/gateway-Telegram%20%7C%20Discord-blueviolet?style=for-the-badge)](#gateway-commands-telegram--discord)
-[![License](https://img.shields.io/npm/l/awas-ai?color=brightgreen&style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/npm/l/awas-agent?color=brightgreen&style=for-the-badge)](LICENSE)
 [![Donate Saweria](https://img.shields.io/badge/Donate-Saweria-orange?style=for-the-badge)](https://saweria.co/dimasla)
 
 ![AWAS TUI Interactive Session](screenshots/Awas.png)
