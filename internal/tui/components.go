@@ -94,7 +94,7 @@ func RenderHeader(modelName, mode string, tokens, maxTokens int, workdir string,
 
 	borderStyle := lipgloss.NewStyle().Foreground(ColorPrimary)
 
-	topBorder := "┌─ AWAS v0.1.1 "
+	topBorder := "┌─ AWAS v0.1.2 "
 	topBorderLen := lipgloss.Width(topBorder)
 	padTop := width - topBorderLen - 1
 	if padTop < 0 {

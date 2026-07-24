@@ -36,7 +36,8 @@ func Run(cfg *config.Config, initialQuery string) error {
 	gwMgr := gateway.NewManager(cfg)
 	m.GatewayMgr = gwMgr
 
-	if !gateway.IsRunning() {
+	if gateway.TryAcquireTUIGatewayLock() {
+		defer gateway.ReleaseTUIGatewayLock()
 		gwCfg := gwMgr.Load()
 		if gwCfg.Enabled {
 			for name, platform := range gwCfg.Platforms {

@@ -49,6 +49,44 @@ func IsRunning() bool {
 	return err == nil
 }
 
+const tuiLockFile = "tui_gateway.lock"
+
+func TUILockFilePath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".awas", tuiLockFile)
+}
+
+func TryAcquireTUIGatewayLock() bool {
+	if IsRunning() {
+		return false
+	}
+	tuiPath := TUILockFilePath()
+	data, err := os.ReadFile(tuiPath)
+	if err == nil {
+		var pid int
+		if _, err := fmt.Sscanf(string(data), "%d", &pid); err == nil && pid > 0 {
+			if process, err := os.FindProcess(pid); err == nil {
+				if err := process.Signal(syscall.Signal(0)); err == nil {
+					return false
+				}
+			}
+		}
+	}
+	_ = os.WriteFile(tuiPath, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
+	return true
+}
+
+func ReleaseTUIGatewayLock() {
+	tuiPath := TUILockFilePath()
+	data, err := os.ReadFile(tuiPath)
+	if err == nil {
+		var pid int
+		if _, err := fmt.Sscanf(string(data), "%d", &pid); err == nil && pid == os.Getpid() {
+			os.Remove(tuiPath)
+		}
+	}
+}
+
 func RunDaemon(cfg *config.Config) error {
 	if IsRunning() {
 		pid, _ := ReadPID()
