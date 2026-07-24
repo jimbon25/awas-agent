@@ -70,7 +70,7 @@ Install globally (requires Node.js 18+):
 
 ```bash
 # Windows (PowerShell / CMD) or macOS / Linux Terminal:
-npm install -g awas-ai@latest
+npm install -g awas-agent@latest
 ```
 
 ### 2. Curl (Linux & macOS)
@@ -86,7 +86,7 @@ curl -fsSL https://raw.githubusercontent.com/jimbon25/awas-agent/main/install.sh
 ```bash
 # Clone repository
 git clone https://github.com/jimbon25/awas-agent.git
-cd awas-ai
+cd awas-agent
 
 # Build binary
 # Linux / macOS:
