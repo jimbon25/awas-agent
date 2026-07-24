@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var Version = "0.1.1"
+var Version = "0.1.2"
 
 func main() {
 	if len(os.Args) > 1 {
@@ -28,11 +28,6 @@ func main() {
 	}
 
 	cfg := config.Load()
-
-	if err := cfg.Validate(); err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err)
-		os.Exit(1)
-	}
 
 	var initialQuery string
 	if len(os.Args) > 1 {
@@ -55,6 +50,10 @@ func handleGatewayCommand() {
 	switch sub {
 	case "run":
 		cfg := config.Load()
+		if err := cfg.Validate(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 		if err := gateway.RunDaemon(cfg); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
