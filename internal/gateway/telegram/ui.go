@@ -49,6 +49,11 @@ type TelegramUI struct {
 	activeGoal         string
 	activeSteps        []string
 	activeStepStatuses map[string]string
+
+	activeMsgID  int
+	editCount    int
+	streamBuffer string
+	lastEditTime time.Time
 }
 
 func NewTelegramUI(bot *tgbotapi.BotAPI, chatID int64, gw *TelegramGateway) *TelegramUI {
@@ -97,11 +102,15 @@ func (u *TelegramUI) startTypingIndicator() {
 }
 
 func (u *TelegramUI) PrintThinking(model string) {
+	u.activeMsgID = 0
+	u.editCount = 0
+	u.streamBuffer = ""
 	u.startTypingIndicator()
 }
 
 func (u *TelegramUI) PrintMessage(role string, content string) {
 	if role == "assistant" && content != "" {
+		u.streamBuffer = content
 		u.sendLongMessage(markdownToHTML(content))
 	} else if role == "system" {
 		msg := tgbotapi.NewMessage(u.chatID, "ℹ "+escapeHTML(content))
@@ -125,20 +134,19 @@ func (u *TelegramUI) SendFile(filePath string, caption string) error {
 }
 
 func (u *TelegramUI) PrintMessageDelta(content string) {
+	u.streamBuffer += content
+	if time.Since(u.lastEditTime) >= 1200*time.Millisecond {
+		u.lastEditTime = time.Now()
+		u.sendLongMessage(markdownToHTML(u.streamBuffer))
+	}
 }
 
 func (u *TelegramUI) PrintToolCall(name string, args string) {
 	summary := summarizeArgs(name, args)
-
-	text := fmt.Sprintf(
-		"<pre>▸ %s\n  %s</pre>",
-		escapeHTML(name),
-		escapeHTML(summary),
-	)
-	msg := tgbotapi.NewMessage(u.chatID, text)
-	msg.ParseMode = "HTML"
-	msg.DisableNotification = true
-	sendBot(u.bot, msg)
+	toolHtml := fmt.Sprintf("\n<pre>▸ %s\n  %s</pre>", escapeHTML(name), escapeHTML(summary))
+	u.streamBuffer += toolHtml
+	u.lastEditTime = time.Now()
+	u.sendLongMessage(u.streamBuffer)
 }
 
 func (u *TelegramUI) PrintToolResult(name string, result string) {
@@ -147,23 +155,15 @@ func (u *TelegramUI) PrintToolResult(name string, result string) {
 	if !success {
 		icon = "✗"
 	}
-
 	displayRes := result
 	displayRes = strings.ReplaceAll(displayRes, "\n", "\n  ")
 	if len(displayRes) > 300 {
 		displayRes = displayRes[:300] + "\n  ..."
 	}
-
-	text := fmt.Sprintf(
-		"<pre>  %s %s\n  %s</pre>",
-		icon,
-		escapeHTML(name),
-		escapeHTML(displayRes),
-	)
-	msg := tgbotapi.NewMessage(u.chatID, text)
-	msg.ParseMode = "HTML"
-	msg.DisableNotification = true
-	sendBot(u.bot, msg)
+	resHtml := fmt.Sprintf("\n<pre>  %s %s\n  %s</pre>", icon, escapeHTML(name), escapeHTML(displayRes))
+	u.streamBuffer += resHtml
+	u.lastEditTime = time.Now()
+	u.sendLongMessage(u.streamBuffer)
 }
 
 func summarizeArgs(name, args string) string {
@@ -315,14 +315,31 @@ func (u *TelegramUI) RequestChainContinue(ctx context.Context) bool {
 }
 
 func (u *TelegramUI) sendLongMessage(text string) {
-	const maxLen = 4000 // Leave some margin
+	const maxLen = 4000 
+	const maxEdits = 25 
 
 	if len(text) <= maxLen {
+		if u.activeMsgID != 0 && u.editCount < maxEdits {
+			editMsg := tgbotapi.NewEditMessageText(u.chatID, u.activeMsgID, text)
+			editMsg.ParseMode = "HTML"
+			if _, err := u.bot.Send(editMsg); err == nil {
+				u.editCount++
+				return
+			}
+		}
+
 		msg := tgbotapi.NewMessage(u.chatID, text)
 		msg.ParseMode = "HTML"
-		sendBot(u.bot, msg)
+		sent, err := sendBotWithResult(u.bot, msg)
+		if err == nil {
+			u.activeMsgID = sent.MessageID
+			u.editCount = 0
+		}
 		return
 	}
+
+	u.activeMsgID = 0
+	u.editCount = 0
 
 	for len(text) > 0 {
 		end := maxLen

@@ -95,7 +95,7 @@ func RenderHeader(modelName, mode string, tokens, maxTokens int, workdir string,
 
 	borderStyle := lipgloss.NewStyle().Foreground(ColorPrimary)
 
-	topBorder := "┌─ AWAS v0.1.3 "
+	topBorder := "┌─ AWAS v0.1.4 "
 	subagents := agent.GetSubagentRegistry().List()
 	activeCount := 0
 	activeRole := ""
@@ -112,12 +112,12 @@ func RenderHeader(modelName, mode string, tokens, maxTokens int, workdir string,
 		frame := frames[(time.Now().UnixNano()/100000000)%int64(len(frames))]
 		if activeCount == 1 {
 			if activeStep != "" {
-				topBorder = fmt.Sprintf("┌─ AWAS v0.1.3 [%s %s: %s] ", frame, activeRole, activeStep)
+				topBorder = fmt.Sprintf("┌─ AWAS v0.1.4 [%s %s: %s] ", frame, activeRole, activeStep)
 			} else {
-				topBorder = fmt.Sprintf("┌─ AWAS v0.1.3 [%s Subagent: %s] ", frame, activeRole)
+				topBorder = fmt.Sprintf("┌─ AWAS v0.1.4 [%s Subagent: %s] ", frame, activeRole)
 			}
 		} else {
-			topBorder = fmt.Sprintf("┌─ AWAS v0.1.3 [%s %d Subagents Running] ", frame, activeCount)
+			topBorder = fmt.Sprintf("┌─ AWAS v0.1.4 [%s %d Subagents Running] ", frame, activeCount)
 		}
 	}
 	topBorderLen := lipgloss.Width(topBorder)

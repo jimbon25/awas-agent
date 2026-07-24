@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var Version = "0.1.3"
+var Version = "0.1.4"
 
 func main() {
 	if len(os.Args) > 1 {

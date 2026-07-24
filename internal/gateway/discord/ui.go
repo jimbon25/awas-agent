@@ -30,6 +30,11 @@ type DiscordUI struct {
 	activeGoal         string
 	activeSteps        []string
 	activeStepStatuses map[string]string
+
+	activeMessageID string
+	editCount       int
+	streamBuffer    string
+	lastEditTime    time.Time
 }
 
 func NewDiscordUI(session *discordgo.Session, threadID string, gw *DiscordGateway) *DiscordUI {
@@ -59,11 +64,15 @@ func (u *DiscordUI) SendChainResponse(continueChain bool) {
 }
 
 func (u *DiscordUI) PrintThinking(model string) {
+	u.activeMessageID = ""
+	u.editCount = 0
+	u.streamBuffer = ""
 	u.session.ChannelTyping(u.threadID)
 }
 
 func (u *DiscordUI) PrintMessage(role string, content string) {
 	if role == "assistant" && content != "" {
+		u.streamBuffer = content
 		u.sendLongMessage(content)
 	} else if role == "system" {
 		msg := "ℹ " + content
@@ -86,12 +95,19 @@ func (u *DiscordUI) SendFile(filePath string, caption string) error {
 }
 
 func (u *DiscordUI) PrintMessageDelta(content string) {
+	u.streamBuffer += content
+	if time.Since(u.lastEditTime) >= 1200*time.Millisecond {
+		u.lastEditTime = time.Now()
+		u.sendLongMessage(u.streamBuffer)
+	}
 }
 
 func (u *DiscordUI) PrintToolCall(name string, args string) {
 	summary := summarizeArgs(name, args)
-	text := fmt.Sprintf("```sh\n▸ %s\n  %s\n```", name, summary)
-	u.session.ChannelMessageSend(u.threadID, text)
+	toolText := fmt.Sprintf("\n```sh\n▸ %s\n  %s\n```", name, summary)
+	u.streamBuffer += toolText
+	u.lastEditTime = time.Now()
+	u.sendLongMessage(u.streamBuffer)
 }
 
 func (u *DiscordUI) PrintToolResult(name string, result string) {
@@ -107,8 +123,10 @@ func (u *DiscordUI) PrintToolResult(name string, result string) {
 		displayRes = displayRes[:300] + "\n  ..."
 	}
 
-	text := fmt.Sprintf("```sh\n  %s %s\n  %s\n```", icon, name, displayRes)
-	u.session.ChannelMessageSend(u.threadID, text)
+	resText := fmt.Sprintf("\n```sh\n  %s %s\n  %s\n```", icon, name, displayRes)
+	u.streamBuffer += resText
+	u.lastEditTime = time.Now()
+	u.sendLongMessage(u.streamBuffer)
 }
 
 func (u *DiscordUI) PrintTokenUsage(count int) {
@@ -237,11 +255,26 @@ func (u *DiscordUI) RequestChainContinue(ctx context.Context) bool {
 
 func (u *DiscordUI) sendLongMessage(text string) {
 	const maxLen = 1900 
+	const maxEdits = 10 
 
 	if len(text) <= maxLen {
-		u.session.ChannelMessageSend(u.threadID, text)
+		if u.activeMessageID != "" && u.editCount < maxEdits {
+			if _, err := u.session.ChannelMessageEdit(u.threadID, u.activeMessageID, text); err == nil {
+				u.editCount++
+				return
+			}
+		}
+
+		sent, err := u.session.ChannelMessageSend(u.threadID, text)
+		if err == nil {
+			u.activeMessageID = sent.ID
+			u.editCount = 0
+		}
 		return
 	}
+
+	u.activeMessageID = ""
+	u.editCount = 0
 
 	for len(text) > 0 {
 		end := maxLen
