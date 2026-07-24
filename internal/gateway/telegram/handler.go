@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"awas/internal/agent"
 	"awas/internal/gateway"
 	"awas/internal/tools"
 	"fmt"
@@ -79,10 +80,29 @@ func (tg *TelegramGateway) handleMessage(msg *tgbotapi.Message, mgr *gateway.Man
 			}
 			loopCfg := session.Loop.GetConfig()
 
+			subagents := agent.GetSubagentRegistry().List()
+			subagentStr := "None"
+			activeSubCount := 0
+			activeRole := ""
+			activeID := ""
+			for _, s := range subagents {
+				if s.Status == agent.SubagentStatusRunning {
+					activeSubCount++
+					activeRole = s.Role
+					activeID = s.ID
+				}
+			}
+			if activeSubCount == 1 {
+				subagentStr = fmt.Sprintf("%s (%s)", activeRole, activeID)
+			} else if activeSubCount > 1 {
+				subagentStr = fmt.Sprintf("%d running", activeSubCount)
+			}
+
 			reply := fmt.Sprintf("⎔ <b>Session Status Info</b>\n"+
 				"──────────────────────────\n"+
 				"• <b>Session ID</b>: <code>%s</code>\n"+
 				"• <b>Status</b>: <code>%s</code>\n"+
+				"• <b>Active Subagents</b>: <code>%s</code>\n"+
 				"• <b>Active Mode</b>: <code>%s</code> (Switch via /mode)\n"+
 				"• <b>Active Model</b>: <code>%s</code>\n"+
 				"• <b>Work Directory</b>: <code>%s</code>\n"+
@@ -91,6 +111,7 @@ func (tg *TelegramGateway) handleMessage(msg *tgbotapi.Message, mgr *gateway.Man
 				"• <b>Last Active</b>: %s",
 				escapeHTML(session.SessionID),
 				escapeHTML(statusStr),
+				escapeHTML(subagentStr),
 				escapeHTML(loopCfg.AgentMode),
 				escapeHTML(loopCfg.Model),
 				escapeHTML(loopCfg.WorkDir),

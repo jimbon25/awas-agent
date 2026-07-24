@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"awas/internal/agent"
 	"awas/internal/gateway"
 	"awas/internal/tools"
 	"fmt"
@@ -215,10 +216,29 @@ func (dg *DiscordGateway) OnInteractionCreate(s *discordgo.Session, i *discordgo
 				}
 				loopCfg := session.Loop.GetConfig()
 
+				subagents := agent.GetSubagentRegistry().List()
+				subagentStr := "None"
+				activeSubCount := 0
+				activeRole := ""
+				activeID := ""
+				for _, s := range subagents {
+					if s.Status == agent.SubagentStatusRunning {
+						activeSubCount++
+						activeRole = s.Role
+						activeID = s.ID
+					}
+				}
+				if activeSubCount == 1 {
+					subagentStr = fmt.Sprintf("%s (%s)", activeRole, activeID)
+				} else if activeSubCount > 1 {
+					subagentStr = fmt.Sprintf("%d running", activeSubCount)
+				}
+
 				reply = fmt.Sprintf("⎔ **Session Status Info**\n"+
 					"──────────────────────────\n"+
 					"• **Session ID**: `%s`\n"+
 					"• **Status**: `%s`\n"+
+					"• **Active Subagents**: `%s`\n"+
 					"• **Active Mode**: `%s` (Switch via `/mode`)\n"+
 					"• **Active Model**: `%s`\n"+
 					"• **Work Directory**: `%s`\n"+
@@ -227,6 +247,7 @@ func (dg *DiscordGateway) OnInteractionCreate(s *discordgo.Session, i *discordgo
 					"• **Last Active**: %s",
 					session.SessionID,
 					statusStr,
+					subagentStr,
 					loopCfg.AgentMode,
 					loopCfg.Model,
 					loopCfg.WorkDir,
