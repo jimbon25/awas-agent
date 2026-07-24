@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 230" width="100%">
+  <rect width="680" height="230" fill="#0d1117" rx="10" stroke="#30363d" stroke-width="1.5"/>
+  <style>
+    .t { font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, 'Liberation Mono', monospace; font-size: 13px; font-weight: 700; white-space: pre; }
+    .c1 { fill: #ff5555; }
+    .c2 { fill: #f1fa8c; }
+    .c3 { fill: #50fa7b; }
+    .c4 { fill: #8be9fd; }
+    .c5 { fill: #ff79c6; }
+    .c6 { fill: #bd93f9; }
+    .c7 { fill: #8be9fd; }
+    .c8 { fill: #f8f8f2; }
+  </style>
+  <g transform="translate(25, 28)">
+    <!-- AWAS -->
+    <text y="0" class="t"><tspan class="c1">  █████╗  </tspan><tspan class="c2">██╗    ██╗ </tspan><tspan class="c3">█████╗  </tspan><tspan class="c4">███████╗</tspan></text>
+    <text y="16" class="t"><tspan class="c1"> ██╔══██╗ </tspan><tspan class="c2">██║    ██║ </tspan><tspan class="c3">██╔══██╗ </tspan><tspan class="c4">██╔════╝</tspan></text>
+    <text y="32" class="t"><tspan class="c1"> ███████║ </tspan><tspan class="c2">██║ █╗ ██║ </tspan><tspan class="c3">███████║ </tspan><tspan class="c4">███████╗</tspan></text>
+    <text y="48" class="t"><tspan class="c1"> ██╔══██║ </tspan><tspan class="c2">██║███╗██║ </tspan><tspan class="c3">██╔══██║ </tspan><tspan class="c4">╚════██║</tspan></text>
+    <text y="64" class="t"><tspan class="c1"> ██║  ██║ </tspan><tspan class="c2">╚███╔███╔╝ </tspan><tspan class="c3">██║  ██║ </tspan><tspan class="c4">███████║</tspan></text>
+    <text y="80" class="t"><tspan class="c1"> ╚═╝  ╚═╝ </tspan><tspan class="c2"> ╚══╝╚══╝  </tspan><tspan class="c3">╚═╝  ╚═╝ </tspan><tspan class="c4">╚══════╝</tspan></text>
+    
+    <!-- AGENT -->
+    <text y="108" class="t"><tspan class="c5">    █████╗  </tspan><tspan class="c6">██████╗  </tspan><tspan class="c7">███████╗ </tspan><tspan class="c8">███╗   ██╗ </tspan><tspan class="c1">████████╗</tspan></text>
+    <text y="124" class="t"><tspan class="c5">   ██╔══██╗ </tspan><tspan class="c6">██╔════╝  </tspan><tspan class="c7">██╔════╝ </tspan><tspan class="c8">████╗  ██║ </tspan><tspan class="c1">╚══██╔══╝</tspan></text>
+    <text y="140" class="t"><tspan class="c5">   ███████║ </tspan><tspan class="c6">██║  ███╗ </tspan><tspan class="c7">█████╗   </tspan><tspan class="c8">██╔██╗ ██║ </tspan><tspan class="c1">   ██║   </tspan></text>
+    <text y="156" class="t"><tspan class="c5">   ██╔══██║ </tspan><tspan class="c6">██║   ██║ </tspan><tspan class="c7">██╔══╝   </tspan><tspan class="c8">██║╚██╗██║ </tspan><tspan class="c1">   ██║   </tspan></text>
+    <text y="172" class="t"><tspan class="c5">   ██║  ██║ </tspan><tspan class="c6">╚██████╔╝ </tspan><tspan class="c7">███████╗ </tspan><tspan class="c8">██║ ╚████║ </tspan><tspan class="c1">   ██║   </tspan></text>
+    <text y="188" class="t"><tspan class="c5">   ╚═╝  ╚═╝ </tspan><tspan class="c6"> ╚═════╝  </tspan><tspan class="c7">╚══════╝ </tspan><tspan class="c8">╚═╝  ╚═══╝ </tspan><tspan class="c1">   ╚═╝   </tspan></text>
+  </g>
+</svg>

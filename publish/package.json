@@ -1,0 +1,23 @@
+{
+  "name": "awas-ai",
+  "version": "0.1.1",
+  "description": "Terminal-based coding assistant (AWAS CLI)",
+  "main": "bin/install.js",
+  "bin": {
+    "awas": "./bin/index.js"
+  },
+  "scripts": {
+    "postinstall": "node bin/install.js"
+  },
+  "keywords": [
+    "ai",
+    "assistant",
+    "cli",
+    "go",
+    "obfuscated",
+    "tui",
+    "pair-programming"
+  ],
+  "author": "luisj1mb",
+  "license": "MIT"
+}

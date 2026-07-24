@@ -1,0 +1,33 @@
+# Compiled Go Binaries
+awas
+awas-test
+awas.exe
+*.exe
+*.exe.test
+
+# Publish Directory Artifacts & Binaries
+publish/bin/awas
+publish/bin/awas.exe
+publish/bin/*.tar.gz
+publish/bin/*.zip
+publish/*.tgz
+publish/node_modules/
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+
+# Logs and Scratch files
+*.log
+scratch/
+tmp/
+dist/
+build/
+planning/
+
+# NPM & Environment files
+.npmrc
+.env
+.env.local
