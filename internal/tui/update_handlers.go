@@ -34,7 +34,14 @@ func handleAgentMessage(m *Model, msg tea.Msg) (tea.Cmd, bool) {
 		return tickThinking(), true
 
 	case ThinkingTickMsg:
-		if m.State == StateThinking {
+		hasSubagent := false
+		for _, s := range agent.GetSubagentRegistry().List() {
+			if s.Status == agent.SubagentStatusRunning {
+				hasSubagent = true
+				break
+			}
+		}
+		if m.State == StateThinking || hasSubagent {
 			m.ThinkingTicks++
 			return tickThinking(), true
 		}

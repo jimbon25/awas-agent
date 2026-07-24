@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"awas/internal/agent"
 	"fmt"
 	"os"
 	"strings"
@@ -94,7 +95,31 @@ func RenderHeader(modelName, mode string, tokens, maxTokens int, workdir string,
 
 	borderStyle := lipgloss.NewStyle().Foreground(ColorPrimary)
 
-	topBorder := "┌─ AWAS v0.1.2 "
+	topBorder := "┌─ AWAS v0.1.3 "
+	subagents := agent.GetSubagentRegistry().List()
+	activeCount := 0
+	activeRole := ""
+	activeStep := ""
+	for _, s := range subagents {
+		if s.Status == agent.SubagentStatusRunning {
+			activeCount++
+			activeRole = s.Role
+			activeStep = s.CurrentStep
+		}
+	}
+	if activeCount > 0 {
+		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		frame := frames[(time.Now().UnixNano()/100000000)%int64(len(frames))]
+		if activeCount == 1 {
+			if activeStep != "" {
+				topBorder = fmt.Sprintf("┌─ AWAS v0.1.3 [%s %s: %s] ", frame, activeRole, activeStep)
+			} else {
+				topBorder = fmt.Sprintf("┌─ AWAS v0.1.3 [%s Subagent: %s] ", frame, activeRole)
+			}
+		} else {
+			topBorder = fmt.Sprintf("┌─ AWAS v0.1.3 [%s %d Subagents Running] ", frame, activeCount)
+		}
+	}
 	topBorderLen := lipgloss.Width(topBorder)
 	padTop := width - topBorderLen - 1
 	if padTop < 0 {

@@ -54,7 +54,7 @@ func (c *CronUI) PrintStepStart(stepID string)                                  
 func (c *CronUI) PrintStepFinish(stepID string, success bool, result string)           {}
 
 func (c *CronUI) SendFile(filePath string, caption string) error {
-	msg := "ℹ️ File output generated: " + filePath
+	msg := "✦ File output generated: " + filePath
 	if caption != "" {
 		msg += " | " + caption
 	}

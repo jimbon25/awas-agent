@@ -70,7 +70,7 @@ func LintAndFormat(workDir string, relativePath string, action string) string {
 		}
 
 	default:
-		return fmt.Sprintf("ℹ️ Language not supported for formatting/linting: %s. File exists and is readable.", ext)
+		return fmt.Sprintf("✦ Language not supported for formatting/linting: %s. File exists and is readable.", ext)
 	}
 
 	return fmt.Sprintf("[Error] invalid action: %q", action)

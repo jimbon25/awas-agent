@@ -48,7 +48,7 @@ func (tp *TUIPresenter) PrintCompression(turns int) {
 }
 
 func (tp *TUIPresenter) SendFile(filePath string, caption string) error {
-	msg := "ℹ️ File output generated: " + filePath
+	msg := "✦ File output generated: " + filePath
 	if caption != "" {
 		msg += " | " + caption
 	}

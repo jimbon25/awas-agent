@@ -591,7 +591,7 @@ func handleSlashCommand(m *Model, userInput string) tea.Cmd {
 				var daemonInfo string
 				if gateway.IsRunning() {
 					pid, _ := gateway.ReadPID()
-					daemonInfo = fmt.Sprintf("ℹ️ Gateway daemon is running in the background (PID %d).", pid)
+					daemonInfo = fmt.Sprintf("✦ Gateway daemon is running in the background (PID %d).", pid)
 				}
 
 				status := m.GatewayMgr.Status()

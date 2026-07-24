@@ -113,6 +113,16 @@ func (s *Store) getDB(id string) (*sql.DB, error) {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_messages_seq ON messages(msg_type, seq);
+
+	CREATE TABLE IF NOT EXISTS subagent_logs (
+		id         TEXT PRIMARY KEY,
+		role       TEXT NOT NULL,
+		prompt     TEXT NOT NULL,
+		status     TEXT NOT NULL,
+		result     TEXT NOT NULL DEFAULT '',
+		created_at TEXT NOT NULL,
+		ended_at   TEXT NOT NULL DEFAULT ''
+	);
 	`
 
 	if _, err := db.Exec(schema); err != nil {
@@ -273,4 +283,20 @@ func (s *Store) Delete(id string) error {
 		return err
 	}
 	return nil
+}
+
+func (s *Store) SaveSubagentLog(sessionID string, id string, role string, prompt string, status string, result string, createdAt time.Time, endedAt time.Time) error {
+	if sessionID == "" {
+		sessionID = "global"
+	}
+	sessionlock.LockWrite(sessionID)
+	defer sessionlock.UnlockWrite(sessionID)
+
+	db, err := s.getDB(sessionID)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`INSERT OR REPLACE INTO subagent_logs (id, role, prompt, status, result, created_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		id, role, prompt, status, result, createdAt.Format(time.RFC3339), endedAt.Format(time.RFC3339))
+	return err
 }

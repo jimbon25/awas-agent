@@ -207,6 +207,18 @@ func (l *Loop) executeTool(ctx context.Context, toolCall client.ToolCall) string
 		content, _ := args["content"].(string)
 		oldText, _ := args["old_text"].(string)
 		result = tools.ManageSkills(action, name, content, oldText)
+	case "invoke_subagent":
+		role, _ := args["role"].(string)
+		prompt, _ := args["prompt"].(string)
+		result = InvokeSubagent(ctx, l.cfg, role, prompt)
+	case "send_message":
+		recipientID, _ := args["recipient_id"].(string)
+		msg, _ := args["message"].(string)
+		result = SendMessageToSubagent(recipientID, msg)
+	case "manage_subagents":
+		action, _ := args["action"].(string)
+		subagentID, _ := args["subagent_id"].(string)
+		result = ManageSubagents(action, subagentID)
 	default:
 		result = fmt.Sprintf("[Error] unknown tool: %s", toolCall.Function.Name)
 	}

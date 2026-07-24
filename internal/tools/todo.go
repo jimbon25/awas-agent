@@ -74,7 +74,7 @@ func ManageTodo(workDir, action string, taskID int, taskDesc, status string) str
 	}
 
 	var sb strings.Builder
-	sb.WriteString("### 📋 Workspace TODO List\n")
+	sb.WriteString("###  Workspace TODO List\n")
 	for _, t := range tasks {
 		box := "[ ]"
 		if t.Status == "completed" {

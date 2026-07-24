@@ -40,6 +40,9 @@
   * Automatically records user preferences (`USER.md`) and environment conventions (`MEMORY.md`).
   * First-turn & periodic system nudges ensure memories stay updated organically.
   * Smart context compression prevents token bloat.
+* **Multi-Agent Architecture**:
+  * Asynchronously spawn specialized subagents (`invoke_subagent`, `send_message`, `manage_subagents`) running in background goroutines.
+  * Delegate complex codebase research, code generation, and testing tasks without blocking the main agent session.
 * **Custom Skills Engine**: Load custom markdown guidelines from `.awas/skills/*.md` to enforce coding styles and workflows.
 * **Cron & Task Scheduler**: One-shot timers or recurring cron jobs (`/cron`) managed in the background.
 * **Multi-Tenant Gateway**:

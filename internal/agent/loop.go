@@ -27,12 +27,13 @@ type UI interface {
 }
 
 type Loop struct {
-	cfg       *config.Config
-	cli       *client.Client
-	history   []client.Message
-	UI        UI
-	Index     *index.Index
-	TurnCount int
+	cfg        *config.Config
+	cli        *client.Client
+	history    []client.Message
+	UI         UI
+	Index      *index.Index
+	TurnCount  int
+	IsSubagent bool
 }
 
 func NewLoop(cfg *config.Config) *Loop {
@@ -46,6 +47,23 @@ func NewLoop(cfg *config.Config) *Loop {
 		{
 			Role:    "system",
 			Content: SystemPrompt + loadLocalSkills() + loadLocalMemories(l.cfg),
+		},
+	}
+	return l
+}
+
+func NewSubagentLoop(cfg *config.Config, subagentID string) *Loop {
+	cloned := *cfg
+	l := &Loop{
+		cfg:        &cloned,
+		cli:        client.New(&cloned),
+		UI:         SilentUI{SubagentID: subagentID},
+		IsSubagent: true,
+	}
+	l.history = []client.Message{
+		{
+			Role:    "system",
+			Content: SubagentSystemPrompt + loadLocalSkills(),
 		},
 	}
 	return l

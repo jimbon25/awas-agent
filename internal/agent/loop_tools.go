@@ -611,7 +611,86 @@ func getTools() []client.Tool {
 				},
 			},
 		},
+		{
+			Type: "function",
+			Function: client.ToolDefinitionInfo{
+				Name:        "invoke_subagent",
+				Description: "Spawns a specialized subagent in a background goroutine to execute a delegated sub-task (e.g. codebase research, code generation, testing, or reviewing) asynchronously. IMPORTANT: After calling this tool, inform the user and STOP calling tools immediately. Do NOT poll manage_subagents in a loop.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"role": map[string]any{
+							"type":        "string",
+							"description": "Role of the subagent (e.g. 'Codebase Researcher', 'UnitTest Writer', 'Code Reviewer')",
+						},
+						"prompt": map[string]any{
+							"type":        "string",
+							"description": "Detailed prompt/instructions for the subagent to execute",
+						},
+					},
+					"required": []string{"role", "prompt"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: client.ToolDefinitionInfo{
+				Name:        "send_message",
+				Description: "Send a message or follow-up instruction to a specific subagent.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"recipient_id": map[string]any{
+							"type":        "string",
+							"description": "The subagent instance ID (e.g. 'subagent-12345')",
+						},
+						"message": map[string]any{
+							"type":        "string",
+							"description": "Message content to deliver to the subagent",
+						},
+					},
+					"required": []string{"recipient_id", "message"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: client.ToolDefinitionInfo{
+				Name:        "manage_subagents",
+				Description: "List active subagents or terminate/kill a running subagent. DO NOT call this tool repeatedly in a loop while waiting for subagents to complete.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"action": map[string]any{
+							"type":        "string",
+							"description": "Action to perform: 'list' (list subagents) or 'kill' (cancel a subagent)",
+						},
+						"subagent_id": map[string]any{
+							"type":        "string",
+							"description": "Subagent ID to target when action is 'kill'",
+						},
+					},
+					"required": []string{"action"},
+				},
+			},
+		},
 	}
+}
+
+func getSubagentTools() []client.Tool {
+	var subTools []client.Tool
+	allTools := getTools()
+	for _, t := range allTools {
+		name := t.Function.Name
+		if name != "invoke_subagent" &&
+			name != "manage_subagents" &&
+			name != "manage_memory" &&
+			name != "manage_cron" &&
+			name != "manage_skills" {
+			subTools = append(subTools, t)
+		}
+	}
+	return subTools
 }
 
 func getChatTools() []client.Tool {

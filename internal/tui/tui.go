@@ -9,6 +9,8 @@ import (
 	"awas/internal/provider"
 	"awas/internal/tools"
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -63,6 +65,34 @@ func Run(cfg *config.Config, initialQuery string) error {
 			p.Send(ev)
 		}
 	}()
+
+	agent.GetSubagentRegistry().RegisterListener(func(ev agent.SubagentEvent) {
+		if ev.Type == "started" && ev.Instance != nil {
+			p.Send(ThinkingTickMsg{})
+		} else if ev.Type == "finished" && ev.Instance != nil {
+			resultText := strings.TrimSpace(ev.Instance.Result)
+			displayResult := resultText
+			if len(displayResult) > 300 {
+				displayResult = displayResult[:297] + "..."
+			}
+			statusMsg := fmt.Sprintf("✦ [Subagent Completed] %s (%s)\n│ Status: %s\n│ Result: %s", ev.Instance.Role, ev.Instance.ID, ev.Instance.Status, displayResult)
+			p.Send(AgentMessageMsg{
+				Role:    "system",
+				Content: statusMsg,
+			})
+
+			wakePrompt := fmt.Sprintf("[Subagent System Notification]: Subagent %s (%s) completed with result:\n%s\nPlease summarize and present the final findings clearly to the user now.",
+				ev.Instance.ID, ev.Instance.Role, resultText)
+
+			go func() {
+				time.Sleep(100 * time.Millisecond)
+				promptChan <- AgentPrompt{
+					Prompt: wakePrompt,
+					Ctx:    context.Background(),
+				}
+			}()
+		}
+	})
 
 	presenter := NewTUIPresenter(p)
 	loop.UI = presenter

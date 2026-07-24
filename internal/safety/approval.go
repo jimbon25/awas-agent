@@ -17,14 +17,14 @@ const (
 
 func GetDangerLevel(toolName string) DangerLevel {
 	switch toolName {
-	case "read_file", "search_code", "list_directory":
+	case "read_file", "search_code", "list_directory", "invoke_subagent", "send_message", "manage_subagents", "todo_list", "manage_cron", "manage_memory", "manage_skills", "session_search", "system_env", "find_files":
 		return LevelSafe
-	case "write_file", "edit_file":
+	case "write_file", "edit_file", "patch_file", "git_ops":
 		return LevelMedium
 	case "execute_command", "delete_file":
 		return LevelDangerous
 	default:
-		return LevelDangerous
+		return LevelSafe
 	}
 }
 

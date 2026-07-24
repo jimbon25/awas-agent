@@ -150,7 +150,9 @@ func (l *Loop) RunAgentCycle(ctx context.Context, userInput string) {
 
 		l.UI.PrintThinking(l.cfg.Model)
 		var toolsList []client.Tool
-		if l.cfg.AgentMode == "chat" {
+		if l.IsSubagent {
+			toolsList = getSubagentTools()
+		} else if l.cfg.AgentMode == "chat" {
 			toolsList = getChatTools()
 		} else {
 			toolsList = getTools()
@@ -273,7 +275,9 @@ func (l *Loop) RunAgentCycleStream(ctx context.Context, userInput string) {
 		l.UI.PrintThinking(l.cfg.Model)
 
 		var toolsList []client.Tool
-		if l.cfg.AgentMode == "chat" {
+		if l.IsSubagent {
+			toolsList = getSubagentTools()
+		} else if l.cfg.AgentMode == "chat" {
 			toolsList = getChatTools()
 		} else {
 			toolsList = getTools()
