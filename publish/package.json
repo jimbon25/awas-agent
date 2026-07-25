@@ -1,6 +1,6 @@
 {
   "name": "awas-agent",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Terminal-based coding assistant (AWAS CLI)",
   "main": "bin/install.js",
   "bin": {

@@ -272,7 +272,7 @@ func NewModel(cfg *config.Config, promptChan chan AgentPrompt) Model {
 func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{
 		textarea.Blink,
-		CheckForUpdates("0.1.5"),
+		CheckForUpdates(Version),
 	}
 	if m.State == StateSetupWizard {
 		cmds = append(cmds, m.WizardModel.Init())

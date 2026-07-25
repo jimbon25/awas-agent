@@ -3,6 +3,7 @@ package tui
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,10 +59,20 @@ func isNewerVersion(current, latest string) bool {
 	lParts := strings.Split(latest, ".")
 
 	for i := 0; i < len(cParts) && i < len(lParts); i++ {
-		if lParts[i] > cParts[i] {
-			return true
-		} else if lParts[i] < cParts[i] {
-			return false
+		cNum, err1 := strconv.Atoi(cParts[i])
+		lNum, err2 := strconv.Atoi(lParts[i])
+		if err1 == nil && err2 == nil {
+			if lNum > cNum {
+				return true
+			} else if lNum < cNum {
+				return false
+			}
+		} else {
+			if lParts[i] > cParts[i] {
+				return true
+			} else if lParts[i] < cParts[i] {
+				return false
+			}
 		}
 	}
 	return len(lParts) > len(cParts)
