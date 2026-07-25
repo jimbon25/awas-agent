@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
-	"strings"
-	"time"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -142,17 +142,6 @@ func (u *DiscordUI) RequestApproval(ctx context.Context, toolName string, args s
 		return true
 	}
 
-	displayArgs := args
-	if len(displayArgs) > 150 {
-		displayArgs = displayArgs[:150] + "..."
-	}
-
-	text := fmt.Sprintf(
-		"🔐 **Approve tool execution?**\n\n**Tool:** `%s`\n**Args:** `%s`\n\nChoose an action below or reply with `/yes` / `/no`",
-		toolName,
-		displayArgs,
-	)
-
 	buttons := []discordgo.MessageComponent{
 		discordgo.ActionsRow{
 			Components: []discordgo.MessageComponent{
@@ -176,36 +165,63 @@ func (u *DiscordUI) RequestApproval(ctx context.Context, toolName string, args s
 		},
 	}
 
-	msgSend := &discordgo.MessageSend{
-		Content:    text,
-		Components: buttons,
+	text := u.streamBuffer
+	if text == "" {
+		text = fmt.Sprintf("```sh\n▸ %s\n```", toolName)
 	}
 
-	sent, err := u.session.ChannelMessageSendComplex(u.threadID, msgSend)
-	if err != nil {
-		log.Printf("[discord] Failed to send approval message: %v", err)
-		return false
+	if u.activeMessageID != "" {
+		msgEdit := &discordgo.MessageEdit{
+			ID:         u.activeMessageID,
+			Channel:    u.threadID,
+			Content:    &text,
+			Components: &buttons,
+		}
+		u.session.ChannelMessageEditComplex(msgEdit)
+		u.approvalMsgID = u.activeMessageID
+	} else {
+		msgSend := &discordgo.MessageSend{
+			Content:    text,
+			Components: buttons,
+		}
+		sent, err := u.session.ChannelMessageSendComplex(u.threadID, msgSend)
+		if err == nil {
+			u.activeMessageID = sent.ID
+			u.approvalMsgID = sent.ID
+		}
 	}
 
 	u.approvalChan = make(chan bool, 1)
-	u.approvalMsgID = sent.ID
 
 	approvalCtx, cancel := context.WithTimeout(ctx, 300*time.Second)
 	defer cancel()
 
+	clearButtons := func() {
+		if u.activeMessageID != "" {
+			emptyComponents := []discordgo.MessageComponent{}
+			msgEdit := &discordgo.MessageEdit{
+				ID:         u.activeMessageID,
+				Channel:    u.threadID,
+				Content:    &u.streamBuffer,
+				Components: &emptyComponents,
+			}
+			u.session.ChannelMessageEditComplex(msgEdit)
+		}
+	}
+
 	select {
 	case approved := <-u.approvalChan:
 		u.approvalChan = nil
+		clearButtons()
 		return approved
 	case <-approvalCtx.Done():
 		u.approvalChan = nil
+		clearButtons()
 		return false
 	}
 }
 
 func (u *DiscordUI) RequestChainContinue(ctx context.Context) bool {
-	text := "⚠ **Reached consecutive tool calls limit. Continue?**"
-
 	buttons := []discordgo.MessageComponent{
 		discordgo.ActionsRow{
 			Components: []discordgo.MessageComponent{
@@ -229,31 +245,82 @@ func (u *DiscordUI) RequestChainContinue(ctx context.Context) bool {
 		},
 	}
 
-	msgSend := &discordgo.MessageSend{
-		Content:    text,
-		Components: buttons,
+	text := u.streamBuffer
+	if text == "" {
+		text = "⚠ **Reached consecutive tool calls limit. Continue?**"
 	}
 
-	sent, err := u.session.ChannelMessageSendComplex(u.threadID, msgSend)
-	if err != nil {
-		log.Printf("[discord] Failed to send chain continue: %v", err)
-		return false
+	if u.activeMessageID != "" {
+		msgEdit := &discordgo.MessageEdit{
+			ID:         u.activeMessageID,
+			Channel:    u.threadID,
+			Content:    &text,
+			Components: &buttons,
+		}
+		u.session.ChannelMessageEditComplex(msgEdit)
+	} else {
+		msgSend := &discordgo.MessageSend{
+			Content:    text,
+			Components: buttons,
+		}
+		sent, err := u.session.ChannelMessageSendComplex(u.threadID, msgSend)
+		if err == nil {
+			u.activeMessageID = sent.ID
+		}
 	}
 
 	u.chainChan = make(chan bool, 1)
-	u.chainMsgID = sent.ID
+
+	clearButtons := func() {
+		if u.activeMessageID != "" {
+			emptyComponents := []discordgo.MessageComponent{}
+			msgEdit := &discordgo.MessageEdit{
+				ID:         u.activeMessageID,
+				Channel:    u.threadID,
+				Content:    &u.streamBuffer,
+				Components: &emptyComponents,
+			}
+			u.session.ChannelMessageEditComplex(msgEdit)
+		}
+	}
 
 	select {
 	case cont := <-u.chainChan:
 		u.chainChan = nil
+		clearButtons()
 		return cont
 	case <-ctx.Done():
 		u.chainChan = nil
+		clearButtons()
 		return false
 	}
 }
 
+var (
+	discordDisplayMathRe = regexp.MustCompile(`(?s)\\\[(.*?)\\\]|\$\$(.*?)\$\$`)
+	discordInlineMathRe  = regexp.MustCompile(`(?s)\\\((.*?)\\\)`)
+)
+
+func cleanDiscordMarkdown(text string) string {
+	text = discordDisplayMathRe.ReplaceAllStringFunc(text, func(match string) string {
+		sub := discordDisplayMathRe.FindStringSubmatch(match)
+		content := sub[1]
+		if content == "" && len(sub) > 2 {
+			content = sub[2]
+		}
+		return fmt.Sprintf("\n```\n%s\n```\n", strings.TrimSpace(content))
+	})
+
+	text = discordInlineMathRe.ReplaceAllStringFunc(text, func(match string) string {
+		sub := discordInlineMathRe.FindStringSubmatch(match)
+		return fmt.Sprintf("`%s`", strings.TrimSpace(sub[1]))
+	})
+
+	return text
+}
+
 func (u *DiscordUI) sendLongMessage(text string) {
+	text = cleanDiscordMarkdown(text)
 	const maxLen = 1900 
 	const maxEdits = 10 
 

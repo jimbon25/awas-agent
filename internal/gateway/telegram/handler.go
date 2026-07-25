@@ -256,10 +256,8 @@ func (tg *TelegramGateway) handleCallbackQuery(query *tgbotapi.CallbackQuery, mg
 	callback := tgbotapi.NewCallback(query.ID, "")
 	bot.Request(callback)
 
-	edit := tgbotapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, query.Message.Text)
-	edit.ParseMode = "HTML"
-	edit.ReplyMarkup = nil
-	sendBot(bot, edit)
+	editMarkup := tgbotapi.NewEditMessageReplyMarkup(query.Message.Chat.ID, query.Message.MessageID, tgbotapi.InlineKeyboardMarkup{InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{}})
+	sendBot(bot, editMarkup)
 
 	switch {
 	case data == "approve":

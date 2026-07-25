@@ -143,10 +143,10 @@ func (u *TelegramUI) PrintMessageDelta(content string) {
 
 func (u *TelegramUI) PrintToolCall(name string, args string) {
 	summary := summarizeArgs(name, args)
-	toolHtml := fmt.Sprintf("\n<pre>▸ %s\n  %s</pre>", escapeHTML(name), escapeHTML(summary))
-	u.streamBuffer += toolHtml
+	toolText := fmt.Sprintf("\n\n```\n▸ %s\n  %s\n```", name, summary)
+	u.streamBuffer += toolText
 	u.lastEditTime = time.Now()
-	u.sendLongMessage(u.streamBuffer)
+	u.sendLongMessage(markdownToHTML(u.streamBuffer))
 }
 
 func (u *TelegramUI) PrintToolResult(name string, result string) {
@@ -160,10 +160,10 @@ func (u *TelegramUI) PrintToolResult(name string, result string) {
 	if len(displayRes) > 300 {
 		displayRes = displayRes[:300] + "\n  ..."
 	}
-	resHtml := fmt.Sprintf("\n<pre>  %s %s\n  %s</pre>", icon, escapeHTML(name), escapeHTML(displayRes))
-	u.streamBuffer += resHtml
+	resText := fmt.Sprintf("\n\n```\n  %s %s\n  %s\n```", icon, name, displayRes)
+	u.streamBuffer += resText
 	u.lastEditTime = time.Now()
-	u.sendLongMessage(u.streamBuffer)
+	u.sendLongMessage(markdownToHTML(u.streamBuffer))
 }
 
 func summarizeArgs(name, args string) string {
@@ -246,16 +246,6 @@ func (u *TelegramUI) RequestApproval(ctx context.Context, toolName string, args 
 		return true
 	}
 
-	displayArgs := args
-	if len(displayArgs) > 150 {
-		displayArgs = displayArgs[:150] + "..."
-	}
-	text := fmt.Sprintf(
-		"⛭ Approve tool execution?\n\n<b>Tool:</b> <code>%s</code>\n<b>Args:</b> <code>%s</code>\n\nReply with /yes or /no",
-		escapeHTML(toolName),
-		escapeHTML(displayArgs),
-	)
-
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("✔ Approve", "approve"),
@@ -263,33 +253,53 @@ func (u *TelegramUI) RequestApproval(ctx context.Context, toolName string, args 
 		),
 	)
 
-	msg := tgbotapi.NewMessage(u.chatID, text)
-	msg.ParseMode = "HTML"
-	msg.ReplyMarkup = keyboard
-	sent, err := u.bot.Send(msg)
-	if err != nil {
-		return false
+	content := markdownToHTML(u.streamBuffer)
+	if content == "" {
+		content = markdownToHTML(fmt.Sprintf("```\n▸ %s\n```", toolName))
+	}
+
+	if u.activeMsgID != 0 {
+		editMsg := tgbotapi.NewEditMessageText(u.chatID, u.activeMsgID, content)
+		editMsg.ParseMode = "HTML"
+		editMsg.ReplyMarkup = &keyboard
+		sendBot(u.bot, editMsg)
+		u.approvalMsgID = u.activeMsgID
+	} else {
+		msg := tgbotapi.NewMessage(u.chatID, content)
+		msg.ParseMode = "HTML"
+		msg.ReplyMarkup = keyboard
+		sent, err := sendBotWithResult(u.bot, msg)
+		if err == nil {
+			u.activeMsgID = sent.MessageID
+			u.approvalMsgID = sent.MessageID
+		}
 	}
 
 	u.approvalChan = make(chan bool, 1)
-	u.approvalMsgID = sent.MessageID
 
 	approvalCtx, aCancel := context.WithTimeout(ctx, 300*time.Second)
 	defer aCancel()
 
+	clearButtons := func() {
+		if u.activeMsgID != 0 {
+			clearMarkup := tgbotapi.NewEditMessageReplyMarkup(u.chatID, u.activeMsgID, tgbotapi.InlineKeyboardMarkup{InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{}})
+			sendBot(u.bot, clearMarkup)
+		}
+	}
+
 	select {
 	case approved := <-u.approvalChan:
 		u.approvalChan = nil
+		clearButtons()
 		return approved
 	case <-approvalCtx.Done():
 		u.approvalChan = nil
+		clearButtons()
 		return false
 	}
 }
 
 func (u *TelegramUI) RequestChainContinue(ctx context.Context) bool {
-	text := "⚠ Reached consecutive tool calls limit. Continue?"
-
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("▶ Continue", "continue_yes"),
@@ -297,19 +307,43 @@ func (u *TelegramUI) RequestChainContinue(ctx context.Context) bool {
 		),
 	)
 
-	msg := tgbotapi.NewMessage(u.chatID, text)
-	msg.ParseMode = "HTML"
-	msg.ReplyMarkup = keyboard
-	sendBot(u.bot, msg)
+	content := markdownToHTML(u.streamBuffer)
+	if content == "" {
+		content = "⚠ Reached consecutive tool calls limit. Continue?"
+	}
+
+	if u.activeMsgID != 0 {
+		editMsg := tgbotapi.NewEditMessageText(u.chatID, u.activeMsgID, content)
+		editMsg.ParseMode = "HTML"
+		editMsg.ReplyMarkup = &keyboard
+		sendBot(u.bot, editMsg)
+	} else {
+		msg := tgbotapi.NewMessage(u.chatID, content)
+		msg.ParseMode = "HTML"
+		msg.ReplyMarkup = keyboard
+		sent, err := sendBotWithResult(u.bot, msg)
+		if err == nil {
+			u.activeMsgID = sent.MessageID
+		}
+	}
 
 	u.chainChan = make(chan bool, 1)
+
+	clearButtons := func() {
+		if u.activeMsgID != 0 {
+			clearMarkup := tgbotapi.NewEditMessageReplyMarkup(u.chatID, u.activeMsgID, tgbotapi.InlineKeyboardMarkup{InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{}})
+			sendBot(u.bot, clearMarkup)
+		}
+	}
 
 	select {
 	case cont := <-u.chainChan:
 		u.chainChan = nil
+		clearButtons()
 		return cont
 	case <-ctx.Done():
 		u.chainChan = nil
+		clearButtons()
 		return false
 	}
 }
@@ -372,6 +406,20 @@ func escapeHTML(s string) string {
 func markdownToHTML(md string) string {
 	s := escapeHTML(md)
 
+	s = displayMathRe.ReplaceAllStringFunc(s, func(match string) string {
+		sub := displayMathRe.FindStringSubmatch(match)
+		content := sub[1]
+		if content == "" && len(sub) > 2 {
+			content = sub[2]
+		}
+		return fmt.Sprintf("<pre><code>%s</code></pre>", strings.TrimSpace(content))
+	})
+
+	s = inlineMathRe.ReplaceAllStringFunc(s, func(match string) string {
+		sub := inlineMathRe.FindStringSubmatch(match)
+		return fmt.Sprintf("<code>%s</code>", strings.TrimSpace(sub[1]))
+	})
+
 	s = fenceRe.ReplaceAllStringFunc(s, func(match string) string {
 		submatches := fenceRe.FindStringSubmatch(match)
 		if len(submatches) < 3 {
@@ -399,11 +447,13 @@ func markdownToHTML(md string) string {
 }
 
 var (
-	fenceRe      = regexp.MustCompile("(?s)```([a-zA-Z0-9]*)\n?(.*?)```")
-	inlineCodeRe = regexp.MustCompile("`([^`\n]+)`")
-	boldRe       = regexp.MustCompile(`\*\*(.+?)\*\*`)
-	italicRe     = regexp.MustCompile(`\*([^*\n]+?)\*`)
-	linkRe       = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+	fenceRe       = regexp.MustCompile("(?s)```([a-zA-Z0-9]*)\n?(.*?)```")
+	displayMathRe = regexp.MustCompile(`(?s)\\\[(.*?)\\\]|\$\$(.*?)\$\$`)
+	inlineMathRe  = regexp.MustCompile(`(?s)\\\((.*?)\\\)`)
+	inlineCodeRe  = regexp.MustCompile("`([^`\n]+)`")
+	boldRe        = regexp.MustCompile(`\*\*(.+?)\*\*`)
+	italicRe      = regexp.MustCompile(`\*([^*\n]+?)\*`)
+	linkRe        = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
 )
 
 func renderBlocks(s string) string {

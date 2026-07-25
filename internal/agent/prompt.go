@@ -67,7 +67,8 @@ SUBAGENT EXECUTION RULES:
 RULES:
 1. Always use relative paths from the working directory.
 2. If you need more info, ask the user.
-3. Be honest about what you don't know — don't make things up.`
+3. MATH & FORMATTING: Do NOT use raw LaTeX bracket delimiters like \[ ... \] or \( ... \). Use standard Markdown code blocks or plain text for math expressions so they render cleanly.
+4. Be honest about what you don't know — don't make things up.`
 
 var (
 	skillsMu     sync.Mutex
