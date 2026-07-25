@@ -138,7 +138,7 @@ func (u *DiscordUI) PrintCompression(turns int) {
 }
 
 func (u *DiscordUI) RequestApproval(ctx context.Context, toolName string, args string, mode string) bool {
-	if toolName == "read_file" || toolName == "search_code" || toolName == "list_directory" {
+	if mode == "autonomous" || toolName == "read_file" || toolName == "search_code" || toolName == "list_directory" {
 		return true
 	}
 
