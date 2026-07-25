@@ -17,6 +17,12 @@ func handleAgentMessage(m *Model, msg tea.Msg) (tea.Cmd, bool) {
 		m.WorkspaceFiles = msg
 		return nil, true
 
+	case UpdateCheckMsg:
+		if msg.LatestVersion != "" {
+			m.LatestVersionAvailable = msg.LatestVersion
+		}
+		return nil, true
+
 	case AgentCancelInitMsg:
 		m.AgentCancel = msg.Cancel
 		return nil, true

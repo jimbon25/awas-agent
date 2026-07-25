@@ -43,7 +43,7 @@ func formatRelativeTime(t time.Time) string {
 	return t.Format("Jan _2")
 }
 
-func RenderHeader(modelName, mode string, tokens, maxTokens int, workdir string, width int, compressedTurns int, streamEnabled bool) string {
+func RenderHeader(modelName, mode string, tokens, maxTokens int, workdir string, width int, compressedTurns int, streamEnabled bool, latestVersionAvailable string) string {
 	home, err := os.UserHomeDir()
 	displayWorkdir := workdir
 	if err == nil && strings.HasPrefix(workdir, home) {
@@ -95,7 +95,7 @@ func RenderHeader(modelName, mode string, tokens, maxTokens int, workdir string,
 
 	borderStyle := lipgloss.NewStyle().Foreground(ColorPrimary)
 
-	topBorder := "┌─ AWAS v0.1.4 "
+	topBorder := "┌─ AWAS v0.1.5 "
 	subagents := agent.GetSubagentRegistry().List()
 	activeCount := 0
 	activeRole := ""
@@ -112,13 +112,15 @@ func RenderHeader(modelName, mode string, tokens, maxTokens int, workdir string,
 		frame := frames[(time.Now().UnixNano()/100000000)%int64(len(frames))]
 		if activeCount == 1 {
 			if activeStep != "" {
-				topBorder = fmt.Sprintf("┌─ AWAS v0.1.4 [%s %s: %s] ", frame, activeRole, activeStep)
+				topBorder = fmt.Sprintf("┌─ AWAS v0.1.5 [%s %s: %s] ", frame, activeRole, activeStep)
 			} else {
-				topBorder = fmt.Sprintf("┌─ AWAS v0.1.4 [%s Subagent: %s] ", frame, activeRole)
+				topBorder = fmt.Sprintf("┌─ AWAS v0.1.5 [%s Subagent: %s] ", frame, activeRole)
 			}
 		} else {
-			topBorder = fmt.Sprintf("┌─ AWAS v0.1.4 [%s %d Subagents Running] ", frame, activeCount)
+			topBorder = fmt.Sprintf("┌─ AWAS v0.1.5 [%s %d Subagents Running] ", frame, activeCount)
 		}
+	} else if latestVersionAvailable != "" {
+		topBorder = fmt.Sprintf("┌─ AWAS v0.1.5 [Update: v%s available — npm i -g awas-agent] ", latestVersionAvailable)
 	}
 	topBorderLen := lipgloss.Width(topBorder)
 	padTop := width - topBorderLen - 1

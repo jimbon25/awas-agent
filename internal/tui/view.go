@@ -26,7 +26,7 @@ func (m Model) View() tea.View {
 		return v
 	}
 
-	sections = append(sections, RenderHeader(m.Cfg.Model, m.Cfg.Mode, m.TokenCount, m.TokenMax, m.Cfg.WorkDir, width, m.CompressedTurns, m.Cfg.Stream))
+	sections = append(sections, RenderHeader(m.Cfg.Model, m.Cfg.Mode, m.TokenCount, m.TokenMax, m.Cfg.WorkDir, width, m.CompressedTurns, m.Cfg.Stream, m.LatestVersionAvailable))
 	sections = append(sections, "")
 
 	if m.State == StateProfileSwitch {
