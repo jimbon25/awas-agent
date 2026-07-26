@@ -64,7 +64,9 @@ func (l *Loop) executeTool(ctx context.Context, toolCall client.ToolCall) string
 		result = tools.ExecuteCommand(l.cfg.WorkDir, cmd)
 	case "read_file":
 		path, _ := args["path"].(string)
-		result = tools.ReadFile(l.cfg.WorkDir, resolveHomePath(path))
+		startLine, _ := args["start_line"].(float64)
+		endLine, _ := args["end_line"].(float64)
+		result = tools.ReadFile(l.cfg.WorkDir, resolveHomePath(path), int(startLine), int(endLine))
 	case "edit_file":
 		filePath, _ := args["file_path"].(string)
 		oldStr, _ := args["old_string"].(string)

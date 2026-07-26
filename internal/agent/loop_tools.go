@@ -25,13 +25,22 @@ func getTools() []client.Tool {
 			Type: "function",
 			Function: client.ToolDefinitionInfo{
 				Name:        "read_file",
-				Description: "Read file contents relative to the workspace directory",
+				Description: "Read file contents relative to the workspace directory. Use start_line/end_line to read specific ranges (much more token-efficient for large files).",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"path": map[string]any{
 							"type":        "string",
 							"description": "Path to the file to read",
+						},
+						"start_line": map[string]any{
+							"type":        "integer",
+							"description": "Line number to start reading from (1-based, default: 1). Use this instead of reading the entire file.",
+							"default":     1,
+						},
+						"end_line": map[string]any{
+							"type":        "integer",
+							"description": "Line number to stop reading at (inclusive). Omit to read until end of file.",
 						},
 					},
 					"required": []string{"path"},
