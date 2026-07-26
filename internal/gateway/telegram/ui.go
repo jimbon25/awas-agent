@@ -403,8 +403,182 @@ func escapeHTML(s string) string {
 	return s
 }
 
+func renderTables(s string) string {
+	lines := strings.Split(s, "\n")
+	var out []string
+	i := 0
+	for i < len(lines) {
+		line := strings.TrimSpace(lines[i])
+		if strings.HasPrefix(line, "|") && i+1 < len(lines) {
+			next := strings.TrimSpace(lines[i+1])
+			if isTableDivider(next) {
+				header := splitTableRow(line)
+				i++ 
+				i++ 
+				var body [][]string
+				for i < len(lines) {
+					trimmed := strings.TrimSpace(lines[i])
+					if !strings.HasPrefix(trimmed, "|") || trimmed == "" {
+						break
+					}
+					if isTableDivider(trimmed) {
+						i++
+						continue
+					}
+					body = append(body, splitTableRow(trimmed))
+					i++
+				}
+				rendered := renderAlignedTable(header, body)
+				out = append(out, rendered)
+				continue
+			}
+		}
+		out = append(out, lines[i])
+		i++
+	}
+	return strings.Join(out, "\n")
+}
+
+func isTableDivider(line string) bool {
+	trimmed := strings.Trim(line, " ")
+	parts := strings.Split(trimmed, "|")
+	if len(parts) < 3 {
+		return false
+	}
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		for _, c := range p {
+			if c != '-' && c != ':' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func splitTableRow(line string) []string {
+	trimmed := strings.TrimSpace(line)
+	trimmed = strings.TrimPrefix(trimmed, "|")
+	trimmed = strings.TrimSuffix(trimmed, "|")
+	parts := strings.Split(trimmed, "|")
+	var result []string
+	for _, p := range parts {
+		result = append(result, strings.TrimSpace(p))
+	}
+	return result
+}
+
+func renderAlignedTable(header []string, body [][]string) string {
+	ncols := len(header)
+	for i := range body {
+		for len(body[i]) < ncols {
+			body[i] = append(body[i], "")
+		}
+	}
+	widths := make([]int, ncols)
+	for _, c := range header {
+		if len(c) > widths[0] {
+			widths[0] = len(c)
+		}
+	}
+	for i, w := range widths {
+		if w < 3 {
+			widths[i] = 3
+		}
+	}
+	for _, row := range body {
+		for j, cell := range row {
+			if j < ncols && len(cell) > widths[j] {
+				widths[j] = len(cell)
+			}
+		}
+	}
+	for i := range widths {
+		if widths[i] < 3 {
+			widths[i] = 3
+		}
+	}
+
+	totalWidth := 0
+	for _, w := range widths {
+		totalWidth += w + 3 
+	}
+	totalWidth += 1 
+
+	if totalWidth > 38 && ncols > 1 {
+		return renderVerticalTable(header, body, ncols)
+	}
+
+	var sb strings.Builder
+	sb.WriteString("<pre><code>")
+	sb.WriteString("|")
+	for j, h := range header {
+		sb.WriteString(" ")
+		sb.WriteString(padRight(h, widths[j]))
+		sb.WriteString(" |")
+	}
+	sb.WriteString("\n")
+	sb.WriteString("|")
+	for j := range widths {
+		sb.WriteString(" ")
+		sb.WriteString(strings.Repeat("-", widths[j]))
+		sb.WriteString(" |")
+	}
+	sb.WriteString("\n")
+	for _, row := range body {
+		sb.WriteString("|")
+		for j := 0; j < ncols; j++ {
+			cell := ""
+			if j < len(row) {
+				cell = row[j]
+			}
+			sb.WriteString(" ")
+			sb.WriteString(padRight(cell, widths[j]))
+			sb.WriteString(" |")
+		}
+		sb.WriteString("\n")
+	}
+	sb.WriteString("</code></pre>")
+	return sb.String()
+}
+
+func renderVerticalTable(header []string, body [][]string, ncols int) string {
+	var sb strings.Builder
+	sb.WriteString("<pre><code>")
+	for ri, row := range body {
+		if ri > 0 {
+			sb.WriteString("─────────────────────\n")
+		}
+		for j := 0; j < ncols; j++ {
+			label := header[j]
+			if j < len(header) {
+				label = header[j]
+			}
+			cell := ""
+			if j < len(row) {
+				cell = row[j]
+			}
+			sb.WriteString(fmt.Sprintf("%s: %s\n", label, cell))
+		}
+	}
+	sb.WriteString("</code></pre>")
+	return sb.String()
+}
+
+func padRight(s string, width int) string {
+	if len(s) >= width {
+		return s[:width]
+	}
+	return s + strings.Repeat(" ", width-len(s))
+}
+
 func markdownToHTML(md string) string {
 	s := escapeHTML(md)
+
+	s = renderTables(s)
 
 	s = displayMathRe.ReplaceAllStringFunc(s, func(match string) string {
 		sub := displayMathRe.FindStringSubmatch(match)
