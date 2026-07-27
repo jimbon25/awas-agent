@@ -607,7 +607,18 @@ func markdownToHTML(md string) string {
 		return fmt.Sprintf("<pre><code>%s</code></pre>", code)
 	})
 
+	preCodeBlocks := regexp.MustCompile(`(?s)<pre><code[^>]*>.*?</code></pre>`)
+	var placeholders []string
+	s = preCodeBlocks.ReplaceAllStringFunc(s, func(match string) string {
+		placeholders = append(placeholders, match)
+		return fmt.Sprintf("\x00PRECODE_%d\x00", len(placeholders)-1)
+	})
+
 	s = inlineCodeRe.ReplaceAllString(s, "<code>$1</code>")
+
+	for i, block := range placeholders {
+		s = strings.Replace(s, fmt.Sprintf("\x00PRECODE_%d\x00", i), block, 1)
+	}
 
 	s = boldRe.ReplaceAllString(s, "<b>$1</b>")
 

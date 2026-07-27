@@ -79,7 +79,6 @@ func (tg *TelegramGateway) Start(ctx context.Context, mgr *gateway.Manager) erro
 	for {
 		select {
 		case <-ctx.Done():
-			bot.StopReceivingUpdates()
 			return nil
 		case update, ok := <-updates:
 			if !ok {
