@@ -43,7 +43,7 @@ func formatRelativeTime(t time.Time) string {
 	return t.Format("Jan _2")
 }
 
-func RenderHeader(modelName, mode string, tokens, maxTokens int, workdir string, width int, compressedTurns int, streamEnabled bool, latestVersionAvailable string) string {
+func RenderHeader(modelName, mode string, tokens, maxTokens int, workdir string, width int, compressedTurns int, streamEnabled bool, updateStatus string, updateNewVersion string) string {
 	home, err := os.UserHomeDir()
 	displayWorkdir := workdir
 	if err == nil && strings.HasPrefix(workdir, home) {
@@ -119,8 +119,12 @@ func RenderHeader(modelName, mode string, tokens, maxTokens int, workdir string,
 		} else {
 			topBorder = fmt.Sprintf("┌─ AWAS v%s [%s %d Subagents Running] ", Version, frame, activeCount)
 		}
-	} else if latestVersionAvailable != "" {
-		topBorder = fmt.Sprintf("┌─ AWAS v%s [Update: v%s available — npm i -g awas-agent] ", Version, latestVersionAvailable)
+	} else if updateStatus == "updating" {
+		topBorder = fmt.Sprintf("┌─ AWAS v%s [⬆ Updating to v%s...] ", Version, updateNewVersion)
+	} else if updateStatus == "done" {
+		topBorder = fmt.Sprintf("┌─ AWAS v%s [✓ Updated! Restart awas to use v%s] ", Version, updateNewVersion)
+	} else if updateStatus == "error" {
+		topBorder = fmt.Sprintf("┌─ AWAS v%s [✗ Update failed — run: npm i -g awas-agent] ", Version)
 	}
 	topBorderLen := lipgloss.Width(topBorder)
 	padTop := width - topBorderLen - 1

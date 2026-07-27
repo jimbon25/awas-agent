@@ -94,7 +94,6 @@ func (tg *TelegramGateway) Stop() error {
 	defer tg.mu.Unlock()
 
 	if tg.bot != nil {
-		tg.bot.StopReceivingUpdates()
 		tg.bot = nil
 	}
 

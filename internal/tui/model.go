@@ -113,11 +113,13 @@ type Model struct {
 
 	Tasks                   []Task
 	TaskCursor              int
-	ActiveTaskCount         int // number of currently running background tasks
+	ActiveTaskCount         int 
 
 	LastCtrlCTime           time.Time
 
 	LatestVersionAvailable  string
+	UpdateStatus            string 
+	UpdateNewVersion        string
 
 	TypewriterRunes         []rune
 	TypewriterIndex         int

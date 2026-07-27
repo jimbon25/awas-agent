@@ -12,7 +12,8 @@ import (
 
 const systemdUnit = `[Unit]
 Description=AWAS Gateway Daemon
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple

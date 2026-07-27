@@ -20,6 +20,18 @@ func handleAgentMessage(m *Model, msg tea.Msg) (tea.Cmd, bool) {
 	case UpdateCheckMsg:
 		if msg.LatestVersion != "" {
 			m.LatestVersionAvailable = msg.LatestVersion
+			m.UpdateStatus = "updating"
+			m.UpdateNewVersion = msg.LatestVersion
+			return AutoUpdate(msg.LatestVersion), true
+		}
+		return nil, true
+
+	case AutoUpdateMsg:
+		if msg.Status == "done" {
+			m.UpdateStatus = "done"
+			m.UpdateNewVersion = msg.NewVersion
+		} else if msg.Status == "error" {
+			m.UpdateStatus = "error"
 		}
 		return nil, true
 

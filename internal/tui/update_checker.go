@@ -3,6 +3,7 @@ package tui
 import (
 	"encoding/json"
 	"net/http"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +14,13 @@ import (
 type UpdateCheckMsg struct {
 	LatestVersion string
 	Err           error
+}
+
+type AutoUpdateMsg struct {
+	Status     string 
+	NewVersion string
+	Err        error
+	Output     string
 }
 
 type npmLatestResponse struct {
@@ -48,6 +56,17 @@ func CheckForUpdates(currentVersion string) tea.Cmd {
 		}
 
 		return UpdateCheckMsg{}
+	}
+}
+
+func AutoUpdate(latestVersion string) tea.Cmd {
+	return func() tea.Msg {
+		cmd := exec.Command("npm", "i", "-g", "awas-agent@"+latestVersion)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return AutoUpdateMsg{Status: "error", Err: err, Output: string(output)}
+		}
+		return AutoUpdateMsg{Status: "done", NewVersion: latestVersion}
 	}
 }
 
