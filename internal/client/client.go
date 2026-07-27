@@ -139,6 +139,38 @@ func NewStreamController(ctx context.Context) (*StreamController, context.Contex
 	}, ctx
 }
 
+func extractErrorMessage(body []byte) string {
+	var envelope struct {
+		Error struct {
+			Message string `json:"message"`
+			Type    string `json:"type"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &envelope); err == nil && envelope.Error.Message != "" {
+		var nested struct {
+			Error struct {
+				Message string `json:"message"`
+				Type    string `json:"type"`
+			} `json:"error"`
+		}
+		if jsonErr := json.Unmarshal([]byte(envelope.Error.Message), &nested); jsonErr == nil && nested.Error.Message != "" {
+			if nested.Error.Type != "" {
+				return fmt.Sprintf("%s: %s", nested.Error.Type, nested.Error.Message)
+			}
+			return envelope.Error.Message
+		}
+		if envelope.Error.Type != "" {
+			return fmt.Sprintf("%s: %s", envelope.Error.Type, envelope.Error.Message)
+		}
+		return envelope.Error.Message
+	}
+	s := strings.TrimSpace(string(body))
+	if idx := strings.Index(s, ": "); idx != -1 && idx < 12 {
+		s = s[idx+2:]
+	}
+	return s
+}
+
 func (sc *StreamController) Cancel() {
 	sc.cancel()
 	sc.closeBody()
@@ -222,7 +254,7 @@ func (c *Client) Send(ctx context.Context, messages []Message, tools []Tool) (*C
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(bodyBytes))
+		return nil, nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, extractErrorMessage(bodyBytes))
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
@@ -279,7 +311,7 @@ func (c *Client) SendStream(ctx context.Context, messages []Message, tools []Too
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(bodyBytes))
+		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, extractErrorMessage(bodyBytes))
 	}
 
 	sc, streamCtx := NewStreamController(ctx)
@@ -329,7 +361,16 @@ func (c *Client) SendStream(ctx context.Context, messages []Message, tools []Too
 
 			var streamResp StreamResponse
 			if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
-				continue 
+				var errEnvelope struct {
+					Error struct {
+						Message string `json:"message"`
+						Type    string `json:"type"`
+					} `json:"error"`
+				}
+				if jsonErr := json.Unmarshal([]byte(data), &errEnvelope); jsonErr == nil && errEnvelope.Error.Message != "" {
+					sc.Ch <- StreamEvent{Type: EventError, Error: fmt.Errorf("%s", extractErrorMessage([]byte(errEnvelope.Error.Message)))}
+				}
+				continue
 			}
 
 			if len(streamResp.Choices) == 0 {
