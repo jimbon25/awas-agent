@@ -2,12 +2,15 @@ package discord
 
 import (
 	"awas/internal/agent"
+	"awas/internal/client"
 	"awas/internal/gateway"
+	"awas/internal/provider"
 	"awas/internal/tools"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -234,8 +237,7 @@ func (dg *DiscordGateway) OnInteractionCreate(s *discordgo.Session, i *discordgo
 					subagentStr = fmt.Sprintf("%d running", activeSubCount)
 				}
 
-				reply = fmt.Sprintf("⎔ **Session Status Info**\n"+
-					"──────────────────────────\n"+
+				reply = fmt.Sprintf("⎔ **Session Status Info**\n\n"+
 					"• **Session ID**: `%s`\n"+
 					"• **Status**: `%s`\n"+
 					"• **Active Subagents**: `%s`\n"+
@@ -382,10 +384,217 @@ func (dg *DiscordGateway) OnInteractionCreate(s *discordgo.Session, i *discordgo
 					},
 				})
 			}
+
+		case "help":
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "📋 **Available Commands**\n\n" +
+						"`/status` — Show session info\n" +
+						"`/reset` — Reset conversation memory\n" +
+						"`/mode` — Switch mode (chat/simple/planned/deep)\n" +
+						"`/model` — View/switch provider profiles and models\n" +
+						"`/tokens` — Show token usage\n" +
+						"`/cron` — Manage scheduled jobs\n" +
+						"`/yes` — Approve tool execution\n" +
+						"`/no` — Reject tool execution\n" +
+						"`/continue` — Continue tool chain\n" +
+						"`/stop` — Stop tool chain",
+				},
+			})
+
+		case "model":
+			modelArg := ""
+			options := i.ApplicationCommandData().Options
+			if len(options) > 0 {
+				modelArg = options[0].StringValue()
+			}
+
+			mgr := provider.NewManager("")
+
+			if modelArg == "" {
+				// Show all profiles as select menu
+				profileNames := make([]string, 0, len(mgr.Profiles))
+				for name := range mgr.Profiles {
+					profileNames = append(profileNames, name)
+				}
+				sort.Strings(profileNames)
+
+				if len(profileNames) == 0 {
+					s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+						Type: discordgo.InteractionResponseChannelMessageWithSource,
+						Data: &discordgo.InteractionResponseData{
+							Content: "✘ No provider profiles found. Run `/setup` to configure one.",
+						},
+					})
+					return
+				}
+
+				var options []discordgo.SelectMenuOption
+				for _, name := range profileNames {
+					p := mgr.Profiles[name]
+					label := fmt.Sprintf("%s — %s", name, p.Model)
+					if name == mgr.ActiveProfile {
+						label += " (active)"
+					}
+					options = append(options, discordgo.SelectMenuOption{
+						Label:       label,
+						Value:       name,
+						Description: fmt.Sprintf("Provider: %s", p.Name),
+					})
+				}
+
+				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "📋 **Select Provider Profile:**",
+						Components: []discordgo.MessageComponent{
+							discordgo.ActionsRow{
+								Components: []discordgo.MessageComponent{
+									discordgo.SelectMenu{
+										CustomID:    "model_select_discord:" + threadID,
+										Placeholder: "Select a provider profile...",
+										Options:     options,
+									},
+								},
+							},
+						},
+					},
+				})
+				return
+			}
+
+			dg.mu.RLock()
+			session, ok := dg.users[threadID]
+			dg.mu.RUnlock()
+
+			if !ok {
+				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "✘ No active session found in this thread.",
+					},
+				})
+				return
+			}
+
+			if p, ok := mgr.Profiles[modelArg]; ok {
+				// Switch profile
+				mgr.ActiveProfile = modelArg
+				mgr.Save()
+				session.Loop.GetConfig().Model = p.Model
+				session.Loop.GetConfig().Endpoint = p.GetEndpoint()
+				session.Loop.GetConfig().APIKey = p.GetAPIKey()
+				session.Loop.SetClient(client.New(p))
+				session.SaveSession(dg.cfg)
+				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: fmt.Sprintf("✔ Switched to profile: **%s** (Model: **%s**)", modelArg, p.Model),
+					},
+				})
+			} else {
+				// Treat as model name
+				session.Loop.GetConfig().Model = modelArg
+				if p, ok := mgr.Profiles[mgr.ActiveProfile]; ok {
+					p.Model = modelArg
+					mgr.Save()
+					session.Loop.SetClient(client.New(p))
+				}
+				session.SaveSession(dg.cfg)
+				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: fmt.Sprintf("✔ Model changed to: **%s**", modelArg),
+					},
+				})
+			}
+
+		case "tokens":
+			dg.mu.RLock()
+			session, exists := dg.users[threadID]
+			dg.mu.RUnlock()
+
+			if !exists {
+				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "✘ No active session found in this thread.",
+					},
+				})
+				return
+			}
+
+			history := session.Loop.GetHistory()
+			tokenCount := agent.EstimateTotalTokens(history)
+			tokenMax := session.Loop.GetConfig().MaxTokens
+			if tokenMax <= 0 {
+				tokenMax = 1
+			}
+
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: fmt.Sprintf("📊 %s / %s tokens",
+						formatDiscordTokens(tokenCount),
+						formatDiscordTokens(tokenMax)),
+				},
+			})
 		}
 
 	case discordgo.InteractionMessageComponent:
 		customID := i.MessageComponentData().CustomID
+
+		// Handle model select menu
+		if strings.HasPrefix(customID, "model_select_discord:") {
+			profileName := i.MessageComponentData().Values[0]
+			selectedThreadID := strings.TrimPrefix(customID, "model_select_discord:")
+
+			dg.mu.RLock()
+			session, ok := dg.users[selectedThreadID]
+			dg.mu.RUnlock()
+
+			if !ok {
+				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseUpdateMessage,
+					Data: &discordgo.InteractionResponseData{
+						Content:    "✘ No active session found.",
+						Components: []discordgo.MessageComponent{},
+					},
+				})
+				return
+			}
+
+			mgr := provider.NewManager("")
+			p, ok := mgr.Profiles[profileName]
+			if !ok {
+				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseUpdateMessage,
+					Data: &discordgo.InteractionResponseData{
+						Content:    fmt.Sprintf("✘ Profile **%s** not found.", profileName),
+						Components: []discordgo.MessageComponent{},
+					},
+				})
+				return
+			}
+
+			mgr.ActiveProfile = profileName
+			mgr.Save()
+			session.Loop.GetConfig().Model = p.Model
+			session.Loop.GetConfig().Endpoint = p.GetEndpoint()
+			session.Loop.GetConfig().APIKey = p.GetAPIKey()
+			session.Loop.SetClient(client.New(p))
+			session.SaveSession(dg.cfg)
+
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseUpdateMessage,
+				Data: &discordgo.InteractionResponseData{
+					Content:    fmt.Sprintf("✔ Switched to profile: **%s** (Model: **%s**)", profileName, p.Model),
+					Components: []discordgo.MessageComponent{},
+				},
+			})
+			return
+		}
 
 		var action string
 		var targetThread string
@@ -413,7 +622,7 @@ func (dg *DiscordGateway) OnInteractionCreate(s *discordgo.Session, i *discordgo
 			Type: discordgo.InteractionResponseUpdateMessage,
 			Data: &discordgo.InteractionResponseData{
 				Content:    i.Message.Content + fmt.Sprintf("\n\n*Selected:* **%s**", strings.ToUpper(action)),
-				Components: []discordgo.MessageComponent{}, 
+				Components: []discordgo.MessageComponent{},
 			},
 		})
 
@@ -472,4 +681,20 @@ func downloadAttachments(attachments []*discordgo.MessageAttachment, workDir str
 		text = fmt.Sprintf("[System Notification: User uploaded file '%s' and saved to 'downloads/%s']\n%s", att.Filename, att.Filename, text)
 	}
 	return text
+}
+
+func formatDiscordTokens(n int) string {
+	s := fmt.Sprintf("%d", n)
+	if len(s) <= 3 {
+		return s
+	}
+	var res []string
+	for len(s) > 3 {
+		res = append([]string{s[len(s)-3:]}, res...)
+		s = s[:len(s)-3]
+	}
+	if len(s) > 0 {
+		res = append([]string{s}, res...)
+	}
+	return strings.Join(res, ",")
 }

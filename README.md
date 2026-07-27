@@ -310,10 +310,12 @@ Use these commands in Telegram or Discord chats:
 
 | Command | Description |
 | :--- | :--- |
-| `/start` | Show welcome message and command overview. |
+| `/help` | Show available commands. |
 | `/reset` | Completely wipe active session history and delete SQLite session file from disk. |
 | `/status` | View session status, active model, mode, token count, workdir, and turn stats. |
 | `/mode [chat\|simple\|planned\|deep]` | Switch active reasoning agent mode for the chat session. |
+| `/model` | View or switch provider profiles and models (reads from `providers.json`). |
+| `/tokens` | Show token usage for the current session. |
 | `/cron` | View, add, or delete scheduled background cron jobs. |
 | `/yes` / `/no` | Approve or reject pending tool execution in Telegram/Discord. |
 | `/continue` / `/stop` | Continue or abort long-running tool execution chains. |

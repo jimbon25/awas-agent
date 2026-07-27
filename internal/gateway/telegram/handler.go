@@ -2,11 +2,14 @@ package telegram
 
 import (
 	"awas/internal/agent"
+	"awas/internal/client"
 	"awas/internal/gateway"
+	"awas/internal/provider"
 	"awas/internal/tools"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -52,8 +55,19 @@ func (tg *TelegramGateway) handleMessage(msg *tgbotapi.Message, mgr *gateway.Man
 	}
 
 	switch {
-	case text == "/start":
-		tg.sendText(chatID, "Hello! I'm AWAS, your AI coding assistant.\n\nSend me any message and I'll help you with your code.\n\nCommands:\n/start — Show this message\n/reset — Reset conversation\n/status — Show session info")
+	case text == "/help":
+		tg.sendText(chatID, "📋 <b>Available Commands</b>\n\n"+
+			"/help — Show this message\n"+
+			"/reset — Reset conversation memory\n"+
+			"/status — Show session info\n"+
+			"/mode — Switch mode (chat/simple/planned/deep)\n"+
+			"/model — View/switch provider profiles and models\n"+
+			"/tokens — Show token usage\n"+
+			"/cron — Manage scheduled jobs\n"+
+			"/yes — Approve tool execution\n"+
+			"/no — Reject tool execution\n"+
+			"/continue — Continue tool chain\n"+
+			"/stop — Stop tool chain")
 		return
 	case text == "/reset":
 		key := fmt.Sprintf("%d", chatID)
@@ -98,8 +112,7 @@ func (tg *TelegramGateway) handleMessage(msg *tgbotapi.Message, mgr *gateway.Man
 				subagentStr = fmt.Sprintf("%d running", activeSubCount)
 			}
 
-			reply := fmt.Sprintf("⎔ <b>Session Status Info</b>\n"+
-				"──────────────────────────\n"+
+			reply := fmt.Sprintf("⎔ <b>Session Status Info</b>\n\n"+
 				"• <b>Session ID</b>: <code>%s</code>\n"+
 				"• <b>Status</b>: <code>%s</code>\n"+
 				"• <b>Active Subagents</b>: <code>%s</code>\n"+
@@ -125,7 +138,7 @@ func (tg *TelegramGateway) handleMessage(msg *tgbotapi.Message, mgr *gateway.Man
 		}
 		return
 
-	case strings.HasPrefix(text, "/mode"):
+	case text == "/mode" || strings.HasPrefix(text, "/mode "):
 		key := fmt.Sprintf("%d", chatID)
 		tg.mu.RLock()
 		session, ok := tg.users[key]
@@ -159,6 +172,99 @@ func (tg *TelegramGateway) handleMessage(msg *tgbotapi.Message, mgr *gateway.Man
 		return
 	case text == "/continue":
 		tg.handleChainReply(chatID, true)
+		return
+	case strings.HasPrefix(text, "/model"):
+		key := fmt.Sprintf("%d", chatID)
+		tg.mu.RLock()
+		session, ok := tg.users[key]
+		tg.mu.RUnlock()
+
+		modelArg := ""
+		if len(text) > len("/model") {
+			modelArg = strings.TrimSpace(text[len("/model"):])
+		}
+
+		mgr := provider.NewManager("")
+
+		if modelArg == "" {
+			// Show all profiles as inline keyboard buttons
+			var rows [][]tgbotapi.InlineKeyboardButton
+			profileNames := make([]string, 0, len(mgr.Profiles))
+			for name := range mgr.Profiles {
+				profileNames = append(profileNames, name)
+			}
+			sort.Strings(profileNames)
+
+			for _, name := range profileNames {
+				p := mgr.Profiles[name]
+				label := fmt.Sprintf("%s — %s (%s)", name, p.Model, p.Name)
+				if name == mgr.ActiveProfile {
+					label = "▶ " + label
+				}
+				btn := tgbotapi.NewInlineKeyboardButtonData(label, "model_select:"+name)
+				rows = append(rows, tgbotapi.NewInlineKeyboardRow(btn))
+			}
+
+			if len(rows) == 0 {
+				tg.sendText(chatID, "✘ No provider profiles found. Run /setup to configure one.")
+				return
+			}
+
+			keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
+			msg := tgbotapi.NewMessage(chatID, "📋 <b>Select Provider Profile:</b>")
+			msg.ParseMode = "HTML"
+			msg.ReplyMarkup = keyboard
+			sendBot(tg.getBot(), msg)
+			return
+		}
+
+		if !ok {
+			tg.sendText(chatID, "✘ No active session.")
+			return
+		}
+
+		if p, ok := mgr.Profiles[modelArg]; ok {
+			// Switch profile
+			mgr.ActiveProfile = modelArg
+			mgr.Save()
+			session.Loop.GetConfig().Model = p.Model
+			session.Loop.GetConfig().Endpoint = p.GetEndpoint()
+			session.Loop.GetConfig().APIKey = p.GetAPIKey()
+			session.Loop.SetClient(client.New(p))
+			session.SaveSession(tg.cfg)
+			tg.sendText(chatID, fmt.Sprintf("✔ Switched to profile: <b>%s</b> (Model: <b>%s</b>)", escapeHTML(modelArg), escapeHTML(p.Model)))
+		} else {
+			// Treat as model name — update current profile's model
+			session.Loop.GetConfig().Model = modelArg
+			if p, ok := mgr.Profiles[mgr.ActiveProfile]; ok {
+				p.Model = modelArg
+				mgr.Save()
+				session.Loop.SetClient(client.New(p))
+			}
+			session.SaveSession(tg.cfg)
+			tg.sendText(chatID, fmt.Sprintf("✔ Model changed to: <b>%s</b>", escapeHTML(modelArg)))
+		}
+		return
+	case strings.HasPrefix(text, "/tokens"):
+		key := fmt.Sprintf("%d", chatID)
+		tg.mu.RLock()
+		session, ok := tg.users[key]
+		tg.mu.RUnlock()
+		if !ok {
+			tg.sendText(chatID, "✘ No active session.")
+			return
+		}
+
+		history := session.Loop.GetHistory()
+		tokenCount := agent.EstimateTotalTokens(history)
+		tokenMax := session.Loop.GetConfig().MaxTokens
+		if tokenMax <= 0 {
+			tokenMax = 1
+		}
+
+		tg.sendText(chatID, fmt.Sprintf("📊 %s / %s tokens",
+			escapeHTML(formatGatewayTokens(tokenCount)),
+			escapeHTML(formatGatewayTokens(tokenMax))))
 		return
 	case text == "/stop":
 		key := fmt.Sprintf("%d", chatID)
@@ -268,6 +374,9 @@ func (tg *TelegramGateway) handleCallbackQuery(query *tgbotapi.CallbackQuery, mg
 		tg.handleChainReply(chatID, true)
 	case data == "continue_no":
 		tg.handleChainReply(chatID, false)
+	case strings.HasPrefix(data, "model_select:"):
+		profileName := strings.TrimPrefix(data, "model_select:")
+		tg.handleModelSelect(chatID, profileName)
 	}
 }
 
@@ -299,6 +408,51 @@ func (tg *TelegramGateway) handleChainReply(chatID int64, continueChain bool) {
 	if ui, ok := session.Loop.UI.(*TelegramUI); ok {
 		ui.SendChainResponse(continueChain)
 	}
+}
+
+func (tg *TelegramGateway) handleModelSelect(chatID int64, profileName string) {
+	key := fmt.Sprintf("%d", chatID)
+	tg.mu.RLock()
+	session, ok := tg.users[key]
+	tg.mu.RUnlock()
+
+	if !ok {
+		tg.sendText(chatID, "✘ No active session.")
+		return
+	}
+
+	mgr := provider.NewManager("")
+	p, ok := mgr.Profiles[profileName]
+	if !ok {
+		tg.sendText(chatID, fmt.Sprintf("✘ Profile <b>%s</b> not found.", escapeHTML(profileName)))
+		return
+	}
+
+	mgr.ActiveProfile = profileName
+	mgr.Save()
+	session.Loop.GetConfig().Model = p.Model
+	session.Loop.GetConfig().Endpoint = p.GetEndpoint()
+	session.Loop.GetConfig().APIKey = p.GetAPIKey()
+	session.Loop.SetClient(client.New(p))
+	session.SaveSession(tg.cfg)
+
+	tg.sendText(chatID, fmt.Sprintf("✔ Switched to profile: <b>%s</b> (Model: <b>%s</b>)", escapeHTML(profileName), escapeHTML(p.Model)))
+}
+
+func formatGatewayTokens(n int) string {
+	s := fmt.Sprintf("%d", n)
+	if len(s) <= 3 {
+		return s
+	}
+	var res []string
+	for len(s) > 3 {
+		res = append([]string{s[len(s)-3:]}, res...)
+		s = s[:len(s)-3]
+	}
+	if len(s) > 0 {
+		res = append([]string{s}, res...)
+	}
+	return strings.Join(res, ",")
 }
 
 func (tg *TelegramGateway) sendText(chatID int64, text string) {

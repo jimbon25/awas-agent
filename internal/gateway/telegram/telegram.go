@@ -234,15 +234,17 @@ func (tg *TelegramGateway) registerCommands() {
 	}
 
 	commands := []tgbotapi.BotCommand{
-		{Command: "start", Description: "Start the bot and show welcome message"},
+		{Command: "help", Description: "Show available commands"},
 		{Command: "reset", Description: "Reset conversation memory"},
 		{Command: "status", Description: "Show current session info"},
+		{Command: "mode", Description: "Switch agent execution mode (chat, simple, planned, deep)"},
+		{Command: "model", Description: "View/switch provider profiles and models"},
+		{Command: "tokens", Description: "Show token usage"},
+		{Command: "cron", Description: "Manage cron/scheduled jobs"},
 		{Command: "yes", Description: "Approve tool execution"},
 		{Command: "no", Description: "Reject tool execution"},
 		{Command: "continue", Description: "Continue tool chain"},
 		{Command: "stop", Description: "Stop tool chain"},
-		{Command: "cron", Description: "Manage cron/scheduled jobs"},
-		{Command: "mode", Description: "Switch agent execution mode (chat, simple, planned, deep)"},
 	}
 
 	config := tgbotapi.NewSetMyCommands(commands...)

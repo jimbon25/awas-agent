@@ -276,36 +276,12 @@ func (dg *DiscordGateway) registerCommands() {
 			Description: "Show the status of the current AWAS session",
 		},
 		{
+			Name:        "help",
+			Description: "Show available commands",
+		},
+		{
 			Name:        "reset",
 			Description: "Reset the current AWAS conversation thread session",
-		},
-		{
-			Name:        "yes",
-			Description: "Approve a pending tool execution",
-		},
-		{
-			Name:        "no",
-			Description: "Reject a pending tool execution",
-		},
-		{
-			Name:        "continue",
-			Description: "Continue the tool execution chain",
-		},
-		{
-			Name:        "stop",
-			Description: "Stop the tool execution chain",
-		},
-		{
-			Name:        "cron",
-			Description: "Manage cron/scheduled jobs",
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "command",
-					Description: "Cron command (e.g. list, delete my-job, or create \"every 30m\" \"prompt\")",
-					Required:    false,
-				},
-			},
 		},
 		{
 			Name:        "mode",
@@ -324,6 +300,50 @@ func (dg *DiscordGateway) registerCommands() {
 					},
 				},
 			},
+		},
+		{
+			Name:        "model",
+			Description: "View/switch provider profiles and models",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "profile",
+					Description: "Profile name or model name (leave empty to see all profiles)",
+					Required:    false,
+				},
+			},
+		},
+		{
+			Name:        "tokens",
+			Description: "Show token usage",
+		},
+		{
+			Name:        "cron",
+			Description: "Manage cron/scheduled jobs",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "command",
+					Description: "Cron command (e.g. list, delete my-job, or create \"every 30m\" \"prompt\")",
+					Required:    false,
+				},
+			},
+		},
+		{
+			Name:        "yes",
+			Description: "Approve a pending tool execution",
+		},
+		{
+			Name:        "no",
+			Description: "Reject a pending tool execution",
+		},
+		{
+			Name:        "continue",
+			Description: "Continue the tool execution chain",
+		},
+		{
+			Name:        "stop",
+			Description: "Stop the tool execution chain",
 		},
 	}
 
