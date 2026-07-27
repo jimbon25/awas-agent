@@ -273,7 +273,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case WorkspaceFilesMsg, UpdateCheckMsg, AgentCancelInitMsg, AgentThinkingMsg, ThinkingTickMsg, AgentPlanCreatedMsg,
+	case WorkspaceFilesMsg, UpdateCheckMsg, AutoUpdateMsg, AgentCancelInitMsg, AgentThinkingMsg, ThinkingTickMsg, AgentPlanCreatedMsg,
 		AgentPlanStepStartMsg, AgentPlanStepFinishMsg, AgentMessageMsg, AgentMessageDeltaMsg,
 		TypewriterTickMsg, AgentToolCallMsg, tools.TaskEvent, AgentToolResultMsg,
 		AgentApprovalRequestMsg, AgentChainLimitRequestMsg, AgentAskUserRequestMsg,
