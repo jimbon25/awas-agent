@@ -31,6 +31,7 @@ type GatewayState struct {
 
 type UserSession struct {
 	UserID       string
+	ThreadID     int
 	DisplayName  string
 	Loop         *agent.Loop
 	SessionID    string

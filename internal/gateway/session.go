@@ -16,14 +16,15 @@ const (
 
 var sessionStore = session.Default()
 
-func CreateUserSession(userID, displayName, platform string, cfg *config.Config) *UserSession {
-	sessionID := fmt.Sprintf("%s-%s-%s", sessionIDPrefix, platform, userID)
+func CreateUserSession(userID, displayName, platform string, threadID int, cfg *config.Config) *UserSession {
+	sessionID := fmt.Sprintf("%s-%s-%s-%d", sessionIDPrefix, platform, userID, threadID)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	loop := agent.NewLoop(cfg)
 
 	s := &UserSession{
 		UserID:      userID,
+		ThreadID:    threadID,
 		DisplayName: displayName,
 		Loop:        loop,
 		SessionID:   sessionID,
@@ -33,6 +34,28 @@ func CreateUserSession(userID, displayName, platform string, cfg *config.Config)
 	}
 
 	s.restoreSession(cfg)
+
+	if threadID == 0 && len(s.Loop.GetHistory()) <= 1 {
+		legacyID := fmt.Sprintf("%s-%s-%s", sessionIDPrefix, platform, userID)
+		legacyData, err := sessionStore.Load(legacyID)
+		if err == nil && legacyData != nil && len(legacyData.History) > 0 {
+			s.Loop.SetHistory(legacyData.History)
+			if legacyData.WorkDir != "" {
+				s.Loop.GetConfig().WorkDir = legacyData.WorkDir
+			}
+			if legacyData.Model != "" {
+				s.Loop.GetConfig().Model = legacyData.Model
+			}
+			if legacyData.Mode != "" {
+				s.Loop.GetConfig().Mode = legacyData.Mode
+			}
+			if legacyData.AgentMode != "" {
+				s.Loop.GetConfig().AgentMode = legacyData.AgentMode
+			}
+			s.SaveSession(cfg)
+			sessionStore.Delete(legacyID)
+		}
+	}
 
 	return s
 }
@@ -100,7 +123,6 @@ func CleanupInactiveSessions(state *GatewayState, cfg *config.Config) {
 	}
 }
 
-// DeleteSession wipes the SQLite database entry for the given session ID.
 func DeleteSession(sessionID string) error {
 	return sessionStore.Delete(sessionID)
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 )
 
@@ -193,17 +194,19 @@ func (mgr *Manager) DeliverMessage(platform string, chatID string, guildID strin
 	switch platform {
 	case "telegram":
 		tgGateway, ok := state.Gateway.(interface {
-			SendText(chatID int64, text string)
+			SendTextToThread(chatID int64, threadID int, text string)
 		})
 		if !ok {
 			return fmt.Errorf("invalid telegram gateway adapter cast")
 		}
 		var cID int64
-		_, err := fmt.Sscanf(chatID, "%d", &cID)
-		if err != nil {
-			return fmt.Errorf("invalid telegram chat id format: %v", err)
+		var tID int
+		if strings.Contains(chatID, ":") {
+			fmt.Sscanf(chatID, "%d:%d", &cID, &tID)
+		} else {
+			fmt.Sscanf(chatID, "%d", &cID)
 		}
-		tgGateway.SendText(cID, text)
+		tgGateway.SendTextToThread(cID, tID, text)
 		return nil
 
 	case "discord":

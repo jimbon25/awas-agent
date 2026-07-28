@@ -13,29 +13,37 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func sendBot(bot *tgbotapi.BotAPI, msg tgbotapi.Chattable) {
+func sendBot(bot *tgbotapi.BotAPI, msg tgbotapi.Chattable, threadID ...int) {
+	tid := 0
+	if len(threadID) > 0 {
+		tid = threadID[0]
+	}
 	switch msg.(type) {
-	case tgbotapi.ChatActionConfig, *tgbotapi.ChatActionConfig,
-		tgbotapi.SetMyCommandsConfig, *tgbotapi.SetMyCommandsConfig:
+	case tgbotapi.SetMyCommandsConfig, *tgbotapi.SetMyCommandsConfig:
 		if _, err := bot.Request(msg); err != nil {
 			log.Printf("[telegram] sendBot request error: %v", err)
 		}
 		return
 	}
 
-	if _, err := bot.Send(msg); err != nil {
+	if _, err := sendBotWithThread(bot, msg, tid); err != nil {
 		log.Printf("[telegram] sendBot error: %v", err)
 	}
 }
 
-func sendBotWithResult(bot *tgbotapi.BotAPI, msg tgbotapi.Chattable) (tgbotapi.Message, error) {
-	return bot.Send(msg)
+func sendBotWithResult(bot *tgbotapi.BotAPI, msg tgbotapi.Chattable, threadID ...int) (tgbotapi.Message, error) {
+	tid := 0
+	if len(threadID) > 0 {
+		tid = threadID[0]
+	}
+	return sendBotWithThread(bot, msg, tid)
 }
 
 type TelegramUI struct {
-	bot    *tgbotapi.BotAPI
-	chatID int64
-	gw     *TelegramGateway
+	bot      *tgbotapi.BotAPI
+	chatID   int64
+	threadID int
+	gw       *TelegramGateway
 
 	approvalChan  chan bool
 	approvalMsgID int 
@@ -56,11 +64,12 @@ type TelegramUI struct {
 	lastEditTime time.Time
 }
 
-func NewTelegramUI(bot *tgbotapi.BotAPI, chatID int64, gw *TelegramGateway) *TelegramUI {
+func NewTelegramUI(bot *tgbotapi.BotAPI, chatID int64, threadID int, gw *TelegramGateway) *TelegramUI {
 	return &TelegramUI{
-		bot:    bot,
-		chatID: chatID,
-		gw:     gw,
+		bot:      bot,
+		chatID:   chatID,
+		threadID: threadID,
+		gw:       gw,
 	}
 }
 
@@ -87,13 +96,13 @@ func (u *TelegramUI) startTypingIndicator() {
 		ctx, cancel := context.WithTimeout(context.Background(), 28*time.Second)
 		defer cancel()
 		action := tgbotapi.NewChatAction(u.chatID, tgbotapi.ChatTyping)
-		sendBot(u.bot, action)
+		sendBot(u.bot, action, u.threadID)
 		ticker := time.NewTicker(4 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
-				sendBot(u.bot, action)
+				sendBot(u.bot, action, u.threadID)
 			case <-ctx.Done():
 				return
 			}
@@ -115,7 +124,7 @@ func (u *TelegramUI) PrintMessage(role string, content string) {
 	} else if role == "system" {
 		msg := tgbotapi.NewMessage(u.chatID, "ℹ "+escapeHTML(content))
 		msg.ParseMode = "HTML"
-		sendBot(u.bot, msg)
+		sendBot(u.bot, msg, u.threadID)
 	}
 }
 
@@ -124,12 +133,12 @@ func (u *TelegramUI) SendFile(filePath string, caption string) error {
 	if ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" {
 		photo := tgbotapi.NewPhoto(u.chatID, tgbotapi.FilePath(filePath))
 		photo.Caption = caption
-		_, err := u.bot.Send(photo)
+		_, err := sendBotWithResult(u.bot, photo, u.threadID)
 		return err
 	}
 	doc := tgbotapi.NewDocument(u.chatID, tgbotapi.FilePath(filePath))
 	doc.Caption = caption
-	_, err := u.bot.Send(doc)
+	_, err := sendBotWithResult(u.bot, doc, u.threadID)
 	return err
 }
 
@@ -238,7 +247,7 @@ func (u *TelegramUI) PrintTokenUsage(count int) {
 func (u *TelegramUI) PrintCompression(turns int) {
 	msg := tgbotapi.NewMessage(u.chatID, fmt.Sprintf("⤓ Earlier conversation compressed (%d turns)", turns))
 	msg.ParseMode = "HTML"
-	sendBot(u.bot, msg)
+	sendBot(u.bot, msg, u.threadID)
 }
 
 func (u *TelegramUI) RequestApproval(ctx context.Context, toolName string, args string, mode string) bool {
@@ -268,7 +277,7 @@ func (u *TelegramUI) RequestApproval(ctx context.Context, toolName string, args 
 		msg := tgbotapi.NewMessage(u.chatID, content)
 		msg.ParseMode = "HTML"
 		msg.ReplyMarkup = keyboard
-		sent, err := sendBotWithResult(u.bot, msg)
+		sent, err := sendBotWithResult(u.bot, msg, u.threadID)
 		if err == nil {
 			u.activeMsgID = sent.MessageID
 			u.approvalMsgID = sent.MessageID
@@ -321,7 +330,7 @@ func (u *TelegramUI) RequestChainContinue(ctx context.Context) bool {
 		msg := tgbotapi.NewMessage(u.chatID, content)
 		msg.ParseMode = "HTML"
 		msg.ReplyMarkup = keyboard
-		sent, err := sendBotWithResult(u.bot, msg)
+		sent, err := sendBotWithResult(u.bot, msg, u.threadID)
 		if err == nil {
 			u.activeMsgID = sent.MessageID
 		}
@@ -364,7 +373,7 @@ func (u *TelegramUI) sendLongMessage(text string) {
 
 		msg := tgbotapi.NewMessage(u.chatID, text)
 		msg.ParseMode = "HTML"
-		sent, err := sendBotWithResult(u.bot, msg)
+		sent, err := sendBotWithResult(u.bot, msg, u.threadID)
 		if err == nil {
 			u.activeMsgID = sent.MessageID
 			u.editCount = 0
@@ -392,7 +401,7 @@ func (u *TelegramUI) sendLongMessage(text string) {
 
 		msg := tgbotapi.NewMessage(u.chatID, chunk)
 		msg.ParseMode = "HTML"
-		sendBot(u.bot, msg)
+		sendBot(u.bot, msg, u.threadID)
 	}
 }
 
@@ -696,7 +705,7 @@ var orderedRe = regexp.MustCompile(`^(\d+)\.\s+(.*)$`)
 
 func (u *TelegramUI) AskUser(ctx context.Context, question string) (string, error) {
 	msg := tgbotapi.NewMessage(u.chatID, fmt.Sprintf("? **Question:** %s\n\n*(Please reply directly to answer)*", question))
-	sendBot(u.bot, msg)
+	sendBot(u.bot, msg, u.threadID)
 
 	u.askChan = make(chan string, 1)
 	defer func() {
@@ -763,7 +772,7 @@ func (u *TelegramUI) PrintPlan(goal string, steps []string) {
 	text := u.formatChecklist()
 	msg := tgbotapi.NewMessage(u.chatID, text)
 	msg.ParseMode = "HTML"
-	sent, err := sendBotWithResult(u.bot, msg)
+	sent, err := sendBotWithResult(u.bot, msg, u.threadID)
 	if err == nil {
 		u.planMsgID = sent.MessageID
 	}

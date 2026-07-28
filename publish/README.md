@@ -47,8 +47,9 @@
 * **Cron & Task Scheduler**: One-shot timers or recurring cron jobs (`/cron`) managed in the background.
 * **Multi-Tenant Gateway**:
   * Background daemon for Telegram & Discord bots.
-  * Per-user isolated SQLite session persistence (`.awas/sessions/`).
-  * Inline interactive approval buttons and slash command controls (`/reset`, `/status`, `/mode`, `/cron`, `/yes`, `/no`).
+  * Per-user & per-thread (Telegram Forum Topics) isolated SQLite session persistence (`.awas/sessions/`).
+  * Full Telegram Forum Topics support: each topic gets an independent agent session with separate mode, model, and conversation history.
+  * Inline interactive approval buttons and slash command controls (`/reset`, `/status`, `/mode`, `/cron`, `/threads`, `/resetall`, `/yes`, `/no`).
   * Security user allowlists (`allowed_users`) to restrict access.
 
 ---
@@ -306,17 +307,19 @@ Use these commands in the interactive TUI prompt:
 
 ### Gateway Commands (Telegram & Discord)
 
-Use these commands in Telegram or Discord chats:
+Use these commands in Telegram or Discord chats. In Telegram Forum Topics, commands operate on a **per-thread basis**:
 
 | Command | Description |
 | :--- | :--- |
 | `/help` | Show available commands. |
-| `/reset` | Completely wipe active session history and delete SQLite session file from disk. |
-| `/status` | View session status, active model, mode, token count, workdir, and turn stats. |
-| `/mode [chat\|simple\|planned\|deep]` | Switch active reasoning agent mode for the chat session. |
+| `/reset` | Reset current thread's conversation history and SQLite session file from disk. |
+| `/threads` | List all active thread/topic sessions in the current Telegram supergroup chat. |
+| `/resetall` | Reset ALL thread sessions across all topics in the chat. |
+| `/status` | View session status, thread ID, active model, mode, token count, workdir, and turn stats. |
+| `/mode [chat\|simple\|planned\|deep]` | Switch active reasoning agent mode for the current thread session. |
 | `/model` | View or switch provider profiles and models (reads from `providers.json`). |
 | `/tokens` | Show token usage for the current session. |
-| `/cron` | View, add, or delete scheduled background cron jobs. |
+| `/cron` | View, add, or delete scheduled background cron jobs (delivers to current thread). |
 | `/yes` / `/no` | Approve or reject pending tool execution in Telegram/Discord. |
 | `/continue` / `/stop` | Continue or abort long-running tool execution chains. |
 

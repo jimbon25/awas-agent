@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -71,10 +72,7 @@ func (tg *TelegramGateway) Start(ctx context.Context, mgr *gateway.Manager) erro
 
 	tg.registerCommands()
 
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-
-	updates := bot.GetUpdatesChan(u)
+	updates := getUpdatesChan(ctx, bot)
 
 	for {
 		select {
@@ -121,23 +119,24 @@ func (tg *TelegramGateway) getBot() *tgbotapi.BotAPI {
 }
 
 func (tg *TelegramGateway) SendText(chatID int64, text string) {
-	tg.sendText(chatID, text)
+	tg.sendTextToThread(chatID, 0, text)
 }
 
-func (tg *TelegramGateway) getSession(chatID int64, displayName string, mgr *gateway.Manager) *gateway.UserSession {
+func (tg *TelegramGateway) getSession(chatID int64, threadID int, displayName string, mgr *gateway.Manager) *gateway.UserSession {
 	tg.mu.Lock()
 	defer tg.mu.Unlock()
 
-	key := fmt.Sprintf("%d", chatID)
+	key := fmt.Sprintf("%d:%d", chatID, threadID)
 	if session, ok := tg.users[key]; ok {
 		session.UpdateActivity()
 		return session
 	}
 
+	chatKey := fmt.Sprintf("%d", chatID)
 	if len(tg.config.AllowedUsers) > 0 {
 		allowed := false
 		for _, id := range tg.config.AllowedUsers {
-			if id == key {
+			if id == chatKey {
 				allowed = true
 				break
 			}
@@ -151,16 +150,16 @@ func (tg *TelegramGateway) getSession(chatID int64, displayName string, mgr *gat
 		return nil
 	}
 
-	session := gateway.CreateUserSession(key, displayName, "telegram", tg.cfg)
+	session := gateway.CreateUserSession(chatKey, displayName, "telegram", threadID, tg.cfg)
 	tg.users[key] = session
 	return session
 }
 
-func (tg *TelegramGateway) removeSession(chatID int64) {
+func (tg *TelegramGateway) removeSession(chatID int64, threadID int) {
 	tg.mu.Lock()
 	defer tg.mu.Unlock()
 
-	key := fmt.Sprintf("%d", chatID)
+	key := fmt.Sprintf("%d:%d", chatID, threadID)
 	if session, ok := tg.users[key]; ok {
 		if session.Cancel != nil {
 			session.Cancel()
@@ -170,6 +169,27 @@ func (tg *TelegramGateway) removeSession(chatID int64) {
 	if ch, ok := tg.msgChs[key]; ok {
 		close(ch)
 		delete(tg.msgChs, key)
+	}
+}
+
+func (tg *TelegramGateway) removeAllSessionsForChat(chatID int64) {
+	tg.mu.Lock()
+	defer tg.mu.Unlock()
+
+	prefix := fmt.Sprintf("%d:", chatID)
+	for key, session := range tg.users {
+		if strings.HasPrefix(key, prefix) {
+			if session.Cancel != nil {
+				session.Cancel()
+			}
+			delete(tg.users, key)
+		}
+	}
+	for key, ch := range tg.msgChs {
+		if strings.HasPrefix(key, prefix) {
+			close(ch)
+			delete(tg.msgChs, key)
+		}
 	}
 }
 
@@ -235,12 +255,14 @@ func (tg *TelegramGateway) registerCommands() {
 
 	commands := []tgbotapi.BotCommand{
 		{Command: "help", Description: "Show available commands"},
-		{Command: "reset", Description: "Reset conversation memory"},
-		{Command: "status", Description: "Show current session info"},
+		{Command: "reset", Description: "Reset current thread conversation"},
+		{Command: "status", Description: "Show current thread session info"},
 		{Command: "mode", Description: "Switch agent execution mode (chat, simple, planned, deep)"},
 		{Command: "model", Description: "View/switch provider profiles and models"},
 		{Command: "tokens", Description: "Show token usage"},
 		{Command: "cron", Description: "Manage cron/scheduled jobs"},
+		{Command: "threads", Description: "List all active thread sessions"},
+		{Command: "resetall", Description: "Reset ALL thread sessions in this chat"},
 		{Command: "yes", Description: "Approve tool execution"},
 		{Command: "no", Description: "Reject tool execution"},
 		{Command: "continue", Description: "Continue tool chain"},
@@ -249,4 +271,14 @@ func (tg *TelegramGateway) registerCommands() {
 
 	config := tgbotapi.NewSetMyCommands(commands...)
 	sendBot(bot, config)
+}
+
+func (tg *TelegramGateway) sendTextToThread(chatID int64, threadID int, text string) {
+	bot := tg.getBot()
+	if bot == nil {
+		return
+	}
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "HTML"
+	sendBot(bot, msg, threadID)
 }

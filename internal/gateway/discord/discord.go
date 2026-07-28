@@ -180,7 +180,7 @@ func (dg *DiscordGateway) getSession(threadID string, displayName string, mgr *g
 		return nil
 	}
 
-	s := gateway.CreateUserSession(threadID, displayName, "discord", dg.cfg)
+	s := gateway.CreateUserSession(threadID, displayName, "discord", 0, dg.cfg)
 	dg.users[threadID] = s
 
 	return s

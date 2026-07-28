@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 )
 
@@ -41,12 +43,41 @@ func IsRunning() bool {
 	if err != nil || pid == 0 {
 		return false
 	}
+	if !isAwasProcess(pid) {
+		RemovePID()
+		return false
+	}
+	return true
+}
+
+func isAwasProcess(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
 	process, err := os.FindProcess(pid)
 	if err != nil {
 		return false
 	}
-	err = process.Signal(syscall.Signal(0))
-	return err == nil
+	if err := process.Signal(syscall.Signal(0)); err != nil {
+		return false
+	}
+
+	if data, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid)); err == nil {
+		cmdStr := string(data)
+		return strings.Contains(cmdStr, "awas")
+	}
+
+	out, err := exec.Command("ps", "-p", fmt.Sprintf("%d", pid), "-o", "comm=").Output()
+	if err == nil && len(out) > 0 {
+		return strings.Contains(strings.ToLower(string(out)), "awas")
+	}
+
+	outWin, errWin := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", pid), "/FO", "CSV", "/NH").Output()
+	if errWin == nil && len(outWin) > 0 {
+		return strings.Contains(strings.ToLower(string(outWin)), "awas")
+	}
+
+	return true
 }
 
 const tuiLockFile = "tui_gateway.lock"
