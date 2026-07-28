@@ -317,6 +317,25 @@ func (tg *TelegramGateway) handleMessage(msg *ExtMessage, mgr *gateway.Manager) 
 		return
 	}
 
+	if threadID > 0 {
+		hasUserMessage := false
+		for _, m := range session.Loop.GetHistory() {
+			if m.Role == "user" {
+				hasUserMessage = true
+				break
+			}
+		}
+		if !hasUserMessage {
+			titleText := text
+			if titleText == "" && msg.Document != nil {
+				titleText = "File: " + msg.Document.FileName
+			} else if titleText == "" && len(msg.Photo) > 0 {
+				titleText = "Photo Upload"
+			}
+			tg.autoRenameThread(chatID, threadID, titleText)
+		}
+	}
+
 	var fileID string
 	var fileName string
 

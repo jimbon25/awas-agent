@@ -85,3 +85,41 @@ func TestThreadSessionKeyIsolation(t *testing.T) {
 		t.Errorf("s2.SessionID = %s, want %s", s2.SessionID, expectedID2)
 	}
 }
+
+func TestCleanThreadTitle(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "short title",
+			input:    "Fix Docker Bug",
+			expected: "Fix Docker Bug",
+		},
+		{
+			name:     "multiline title (takes first line)",
+			input:    "Setup PostgreSQL Docker\nHere are details...",
+			expected: "Setup PostgreSQL Docker",
+		},
+		{
+			name:     "long title (truncated to 35 chars)",
+			input:    "How to configure SearXNG search engine instance with custom settings",
+			expected: "How to configure SearXNG search...",
+		},
+		{
+			name:     "system notification prefix stripped",
+			input:    "[System Notification: User uploaded file 'app.go' and saved to 'downloads/app.go']\nCheck this code",
+			expected: "Check this code",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cleanThreadTitle(tt.input)
+			if got != tt.expected {
+				t.Errorf("cleanThreadTitle(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}

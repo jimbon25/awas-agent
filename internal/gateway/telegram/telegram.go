@@ -282,3 +282,46 @@ func (tg *TelegramGateway) sendTextToThread(chatID int64, threadID int, text str
 	msg.ParseMode = "HTML"
 	sendBot(bot, msg, threadID)
 }
+
+func cleanThreadTitle(rawText string) string {
+	title := strings.TrimSpace(rawText)
+	if idx := strings.Index(title, "]\n"); idx != -1 && strings.HasPrefix(title, "[System Notification:") {
+		title = strings.TrimSpace(title[idx+2:])
+	}
+	if idx := strings.Index(title, "\n"); idx != -1 {
+		title = title[:idx]
+	}
+	title = strings.TrimSpace(title)
+	if len(title) > 35 {
+		title = strings.TrimSpace(title[:32]) + "..."
+	}
+	return title
+}
+
+func (tg *TelegramGateway) autoRenameThread(chatID int64, threadID int, rawText string) {
+	if threadID == 0 || strings.TrimSpace(rawText) == "" {
+		return
+	}
+	title := cleanThreadTitle(rawText)
+	if title == "" {
+		return
+	}
+	bot := tg.getBot()
+	if bot == nil {
+		return
+	}
+
+	params := tgbotapi.Params{
+		"chat_id":           fmt.Sprintf("%d", chatID),
+		"message_thread_id": fmt.Sprintf("%d", threadID),
+		"name":              title,
+	}
+
+	go func() {
+		if _, err := bot.MakeRequest("editForumTopic", params); err != nil {
+			log.Printf("[telegram] autoRenameThread (%d:%d -> %q): %v", chatID, threadID, title, err)
+		} else {
+			log.Printf("[telegram] Thread %d:%d auto-renamed to %q", chatID, threadID, title)
+		}
+	}()
+}
