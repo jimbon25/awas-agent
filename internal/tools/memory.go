@@ -94,6 +94,9 @@ func ManageMemory(action, target, content, oldText string) string {
 		if !strings.HasPrefix(line, "- ") {
 			line = "- " + line
 		}
+		if strings.Contains(fileContent, line) {
+			return "Memory already contains this info, skipped duplicate."
+		}
 		if !strings.HasSuffix(fileContent, "\n") {
 			fileContent += "\n"
 		}

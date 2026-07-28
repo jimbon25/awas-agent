@@ -57,6 +57,15 @@ func ExecuteCommand(workDir string, command string) string {
 	if runtime.GOOS == "windows" {
 		cmd = exec.CommandContext(ctx, "cmd", "/C", command)
 	} else {
+		_, err := exec.LookPath("bash")
+		if err != nil {
+			res := ExecuteResult{
+				ExitCode: -1,
+				Error:    "bash not found in PATH. Install bash or use a different shell.",
+			}
+			resBytes, _ := json.Marshal(res)
+			return string(resBytes)
+		}
 		cmd = exec.CommandContext(ctx, "bash", "-c", command)
 	}
 	cmd.Dir = workDir
