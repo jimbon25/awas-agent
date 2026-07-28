@@ -8,7 +8,7 @@ func getTools() []client.Tool {
 			Type: "function",
 			Function: client.ToolDefinitionInfo{
 				Name:        "execute_command",
-				Description: "Run a bash command in the workspace directory",
+				Description: "Run a shell command in the workspace directory",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
