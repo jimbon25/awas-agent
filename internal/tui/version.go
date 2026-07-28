@@ -1,3 +1,3 @@
 package tui
 
-var Version = "0.1.17"
+var Version = "0.1.18"
