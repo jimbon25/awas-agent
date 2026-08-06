@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"awas/internal/agent"
 	"awas/internal/config"
 	"awas/internal/gateway"
 	"context"
@@ -28,8 +29,8 @@ type TelegramGateway struct {
 	config gateway.Platform
 	cfg    *config.Config
 	bot    *tgbotapi.BotAPI
-	users  map[string]*gateway.UserSession 
-	msgChs map[string]chan pendingMsg       
+	users  map[string]*gateway.UserSession
+	msgChs map[string]chan pendingMsg
 	mu     sync.RWMutex
 	cancel context.CancelFunc
 }
@@ -195,7 +196,7 @@ func (tg *TelegramGateway) removeAllSessionsForChat(chatID int64) {
 
 func (tg *TelegramGateway) ensureProcessor(key string, session *gateway.UserSession) {
 	if _, ok := tg.msgChs[key]; ok {
-		return 
+		return
 	}
 
 	ch := make(chan pendingMsg, 10)
@@ -221,8 +222,7 @@ func (tg *TelegramGateway) ensureProcessor(key string, session *gateway.UserSess
 			session.Loop.UI = msg.ui
 
 			ctx, cancel := context.WithTimeout(session.Ctx, processTimeout)
-			ctx = context.WithValue(ctx, "platform", "telegram")
-			ctx = context.WithValue(ctx, "chat_id", key)
+			ctx = agent.WithGatewayMeta(ctx, "telegram", key, "")
 
 			tg.mu.Lock()
 			session.IsRunning = true

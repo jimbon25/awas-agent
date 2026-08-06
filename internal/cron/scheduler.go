@@ -20,7 +20,7 @@ type Scheduler struct {
 	mgr      MessageDeliverer
 	cfg      *config.Config
 	runner   AgentRunner
-	running  map[string]context.CancelFunc 
+	running  map[string]context.CancelFunc
 	mu       sync.Mutex
 	stopChan chan struct{}
 	wg       sync.WaitGroup
@@ -68,6 +68,34 @@ func (s *Scheduler) Stop() {
 	s.mu.Unlock()
 
 	log.Printf("[cron] Scheduler loop stopped.")
+}
+
+func (s *Scheduler) RunJob(name string) (string, error) {
+	job, err := s.store.GetJob(name)
+	if err != nil {
+		return "", fmt.Errorf("job %q not found: %w", name, err)
+	}
+
+	s.mu.Lock()
+	if _, isRunning := s.running[name]; isRunning {
+		s.mu.Unlock()
+		return "", fmt.Errorf("job %q is already running", name)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	s.running[name] = cancel
+	s.mu.Unlock()
+
+	go func() {
+		defer func() {
+			s.mu.Lock()
+			delete(s.running, name)
+			cancel()
+			s.mu.Unlock()
+		}()
+		s.executeJob(ctx, job)
+	}()
+
+	return "", nil
 }
 
 func (s *Scheduler) runDueJobs() {
@@ -130,7 +158,7 @@ func (s *Scheduler) executeJob(ctx context.Context, job *CronJob) {
 	defer runCancel()
 
 	cronUI := NewCronUI()
-	
+
 	s.runner(runCtx, &jobCfg, job.Prompt, cronUI)
 
 	output := cronUI.GetOutput()

@@ -28,9 +28,9 @@ func (l *Loop) executeTool(ctx context.Context, toolCall client.ToolCall) string
 		schedule, _ := args["schedule"].(string)
 		prompt, _ := args["prompt"].(string)
 
-		platform, _ := ctx.Value("platform").(string)
-		chatID, _ := ctx.Value("chat_id").(string)
-		guildID, _ := ctx.Value("guild_id").(string)
+		platform := PlatformFrom(ctx)
+		chatID := ChatIDFrom(ctx)
+		guildID := GuildIDFrom(ctx)
 
 		if platform == "" {
 			platform = "all"
@@ -305,4 +305,3 @@ func ClassifyToolError(toolName string, result string) ErrorType {
 	}
 	return ErrUnknown
 }
-

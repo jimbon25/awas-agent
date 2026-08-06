@@ -40,7 +40,7 @@ func (dg *DiscordGateway) OnMessageCreate(s *discordgo.Session, m *discordgo.Mes
 		guildID = dg.config.Extra["guild_id"]
 	}
 	if guildID != "" && m.GuildID != guildID {
-		return 
+		return
 	}
 
 	channel, err := s.State.Channel(m.ChannelID)
@@ -94,7 +94,7 @@ func (dg *DiscordGateway) OnMessageCreate(s *discordgo.Session, m *discordgo.Mes
 			args = []string{cleanContent}
 		}
 
-		response := gateway.HandleCronCommand(mgr.CronStore, "discord", m.ChannelID, m.GuildID, args)
+		response := gateway.HandleCronCommand(mgr.CronStore, mgr.CronScheduler, "discord", m.ChannelID, m.GuildID, args)
 		dg.SendText(m.ChannelID, response)
 		return
 	}
@@ -152,7 +152,7 @@ func (dg *DiscordGateway) OnMessageCreate(s *discordgo.Session, m *discordgo.Mes
 
 		thread, err := s.MessageThreadStartComplex(m.ChannelID, m.ID, &discordgo.ThreadStart{
 			Name:                threadName,
-			AutoArchiveDuration: 60, 
+			AutoArchiveDuration: 60,
 			Type:                discordgo.ChannelTypeGuildPublicThread,
 		})
 		if err != nil {
@@ -191,7 +191,7 @@ func (dg *DiscordGateway) OnInteractionCreate(s *discordgo.Session, i *discordgo
 		guildID = dg.config.Extra["guild_id"]
 	}
 	if guildID != "" && i.GuildID != guildID {
-		return 
+		return
 	}
 
 	threadID := i.ChannelID
@@ -326,7 +326,7 @@ func (dg *DiscordGateway) OnInteractionCreate(s *discordgo.Session, i *discordgo
 				args = strings.Fields(cmdArg)
 			}
 
-			response := gateway.HandleCronCommand(mgr.CronStore, "discord", threadID, i.GuildID, args)
+			response := gateway.HandleCronCommand(mgr.CronStore, mgr.CronScheduler, "discord", threadID, i.GuildID, args)
 
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,

@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"awas/internal/agent"
 	"awas/internal/config"
 	"awas/internal/gateway"
 	"context"
@@ -28,8 +29,8 @@ type DiscordGateway struct {
 	config  gateway.Platform
 	cfg     *config.Config
 	session *discordgo.Session
-	users   map[string]*gateway.UserSession 
-	msgChs  map[string]chan pendingMsg      
+	users   map[string]*gateway.UserSession
+	msgChs  map[string]chan pendingMsg
 	mu      sync.RWMutex
 	cancel  context.CancelFunc
 }
@@ -205,7 +206,7 @@ func (dg *DiscordGateway) removeSession(threadID string) {
 
 func (dg *DiscordGateway) ensureProcessor(threadID string, session *gateway.UserSession) {
 	if dg.msgChs[threadID] != nil {
-		return 
+		return
 	}
 
 	ch := make(chan pendingMsg, 10)
@@ -231,15 +232,12 @@ func (dg *DiscordGateway) ensureProcessor(threadID string, session *gateway.User
 
 			session.Loop.UI = msg.ui
 
-			ctx, cancel := context.WithTimeout(session.Ctx, processTimeout)
-			ctx = context.WithValue(ctx, "platform", "discord")
-			ctx = context.WithValue(ctx, "chat_id", threadID)
-
 			guildID := ""
 			if dg.config.Extra != nil {
 				guildID = dg.config.Extra["guild_id"]
 			}
-			ctx = context.WithValue(ctx, "guild_id", guildID)
+			ctx, cancel := context.WithTimeout(session.Ctx, processTimeout)
+			ctx = agent.WithGatewayMeta(ctx, "discord", threadID, guildID)
 
 			dg.mu.Lock()
 			session.IsRunning = true

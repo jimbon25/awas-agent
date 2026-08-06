@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func HandleCronCommand(store *cron.Store, platform string, chatID string, guildID string, args []string) string {
+func HandleCronCommand(store *cron.Store, scheduler *cron.Scheduler, platform string, chatID string, guildID string, args []string) string {
 	if len(args) == 0 {
 		return showCronHelp()
 	}
@@ -56,9 +56,14 @@ func HandleCronCommand(store *cron.Store, platform string, chatID string, guildI
 			return "✘ Please specify the job name to run. Example: `/cron run my-job`"
 		}
 		name := args[1]
-		_, err := store.GetJob(name)
-		if err != nil {
+		if scheduler == nil {
+			return "✘ Cron scheduler is not running (gateway daemon offline). Start the gateway first, or wait for the scheduled time."
+		}
+		if _, err := store.GetJob(name); err != nil {
 			return fmt.Sprintf("✘ Job %q not found.", name)
+		}
+		if _, err := scheduler.RunJob(name); err != nil {
+			return fmt.Sprintf("✘ Failed to trigger job %q: %v", name, err)
 		}
 		return fmt.Sprintf("✦ Job %q triggered. It will run in the background shortly.", name)
 

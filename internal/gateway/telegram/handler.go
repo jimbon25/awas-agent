@@ -306,7 +306,7 @@ func (tg *TelegramGateway) handleMessage(msg *ExtMessage, mgr *gateway.Manager) 
 			args = []string{text}
 		}
 
-		response := gateway.HandleCronCommand(mgr.CronStore, "telegram", fmt.Sprintf("%d:%d", chatID, threadID), "", args)
+		response := gateway.HandleCronCommand(mgr.CronStore, mgr.CronScheduler, "telegram", fmt.Sprintf("%d:%d", chatID, threadID), "", args)
 		tg.sendTextToThread(chatID, threadID, response)
 		return
 	}
@@ -487,8 +487,13 @@ func (tg *TelegramGateway) handleThreadsList(chatID int64, threadID int) {
 	for key, session := range tg.users {
 		if strings.HasPrefix(key, prefix) {
 			threads = append(threads, threadInfo{
-				threadID:   session.ThreadID,
-				status:     func() string { if session.IsRunning { return "Running ❯" }; return "Idle ⧗" }(),
+				threadID: session.ThreadID,
+				status: func() string {
+					if session.IsRunning {
+						return "Running ❯"
+					}
+					return "Idle ⧗"
+				}(),
 				messages:   len(session.Loop.GetHistory()),
 				lastActive: session.LastActive,
 				mode:       session.Loop.GetConfig().AgentMode,

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 )
 
 type LLMProvider interface {
@@ -20,11 +21,11 @@ type LLMProvider interface {
 }
 
 type Message struct {
-	Role       string      `json:"role"`
-	Content    string      `json:"content,omitempty"`
-	Name       string      `json:"name,omitempty"`
-	ToolCallID string      `json:"tool_call_id,omitempty"`
-	ToolCalls  []ToolCall  `json:"tool_calls,omitempty"`
+	Role       string     `json:"role"`
+	Content    string     `json:"content,omitempty"`
+	Name       string     `json:"name,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 }
 
 type ToolCall struct {
@@ -35,7 +36,7 @@ type ToolCall struct {
 
 type ToolFunction struct {
 	Name      string `json:"name"`
-	Arguments string `json:"arguments"` 
+	Arguments string `json:"arguments"`
 }
 
 type Tool struct {
@@ -73,11 +74,10 @@ type Choice struct {
 	FinishReason string  `json:"finish_reason"`
 }
 
-
 type StreamChoice struct {
-	Index    int            `json:"index"`
-	Delta    MessageDelta   `json:"delta"`
-	FinishReason *string    `json:"finish_reason"`
+	Index        int          `json:"index"`
+	Delta        MessageDelta `json:"delta"`
+	FinishReason *string      `json:"finish_reason"`
 }
 
 type MessageDelta struct {
@@ -87,10 +87,10 @@ type MessageDelta struct {
 }
 
 type ToolCallDelta struct {
-	Index    int              `json:"index"`
-	ID       *string          `json:"id,omitempty"`
-	Type     *string          `json:"type,omitempty"`
-	Function *FunctionDelta   `json:"function,omitempty"`
+	Index    int            `json:"index"`
+	ID       *string        `json:"id,omitempty"`
+	Type     *string        `json:"type,omitempty"`
+	Function *FunctionDelta `json:"function,omitempty"`
 }
 
 type FunctionDelta struct {
@@ -105,12 +105,12 @@ type StreamResponse struct {
 
 type StreamEvent struct {
 	Type         EventType
-	Content      string       
-	Role         string       
+	Content      string
+	Role         string
 	ToolCalls    []ToolCallDelta
-	FinishReason string       
-	Usage        *Usage       
-	Error        error        
+	FinishReason string
+	Usage        *Usage
+	Error        error
 }
 
 type EventType int
@@ -127,7 +127,8 @@ type StreamController struct {
 	cancel   context.CancelFunc
 	once     sync.Once
 	bodyOnce sync.Once
-	body     io.ReadCloser 
+	body     io.ReadCloser
+	ctx      context.Context
 }
 
 func NewStreamController(ctx context.Context) (*StreamController, context.Context) {
@@ -136,7 +137,17 @@ func NewStreamController(ctx context.Context) (*StreamController, context.Contex
 		Ch:     make(chan StreamEvent, 64),
 		done:   make(chan struct{}),
 		cancel: cancel,
+		ctx:    ctx,
 	}, ctx
+}
+
+func (sc *StreamController) emit(ev StreamEvent) bool {
+	select {
+	case sc.Ch <- ev:
+		return true
+	case <-sc.ctx.Done():
+		return false
+	}
 }
 
 func extractErrorMessage(body []byte) string {
@@ -174,7 +185,10 @@ func extractErrorMessage(body []byte) string {
 func (sc *StreamController) Cancel() {
 	sc.cancel()
 	sc.closeBody()
-	<-sc.done
+	select {
+	case <-sc.done:
+	case <-time.After(3 * time.Second): 
+	}
 }
 
 func (sc *StreamController) closeBody() {
@@ -355,7 +369,9 @@ func (c *Client) SendStream(ctx context.Context, messages []Message, tools []Too
 
 			data := strings.TrimPrefix(line, "data: ")
 			if data == "[DONE]" {
-				sc.Ch <- StreamEvent{Type: EventDone}
+				if !sc.emit(StreamEvent{Type: EventDone}) {
+					return
+				}
 				return
 			}
 
@@ -368,7 +384,7 @@ func (c *Client) SendStream(ctx context.Context, messages []Message, tools []Too
 					} `json:"error"`
 				}
 				if jsonErr := json.Unmarshal([]byte(data), &errEnvelope); jsonErr == nil && errEnvelope.Error.Message != "" {
-					sc.Ch <- StreamEvent{Type: EventError, Error: fmt.Errorf("%s", extractErrorMessage([]byte(errEnvelope.Error.Message)))}
+					sc.emit(StreamEvent{Type: EventError, Error: fmt.Errorf("%s", extractErrorMessage([]byte(errEnvelope.Error.Message)))})
 				}
 				continue
 			}
@@ -400,7 +416,9 @@ func (c *Client) SendStream(ctx context.Context, messages []Message, tools []Too
 				event.Usage = streamResp.Usage
 			}
 
-			sc.Ch <- event
+			if !sc.emit(event) {
+				return
+			}
 		}
 	}()
 
