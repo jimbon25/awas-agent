@@ -19,12 +19,12 @@ func GetDangerLevel(toolName string) DangerLevel {
 	switch toolName {
 	case "read_file", "search_code", "list_directory", "invoke_subagent", "send_message", "manage_subagents", "todo_list", "manage_cron", "manage_memory", "manage_skills", "session_search", "system_env", "find_files":
 		return LevelSafe
-	case "write_file", "edit_file", "patch_file", "git_ops":
+	case "write_file", "edit_file", "patch_file", "git_ops", "download_file", "sql_query", "http_request", "lint_and_format":
 		return LevelMedium
 	case "execute_command", "delete_file":
 		return LevelDangerous
 	default:
-		return LevelSafe
+		return LevelDangerous
 	}
 }
 

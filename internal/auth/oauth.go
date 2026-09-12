@@ -8,8 +8,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -125,15 +123,6 @@ func (a *AuthClient) requestToken(deviceCode string) (string, bool, time.Duratio
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", false, 0, err
-	}
-
-	if home, err := os.UserHomeDir(); err == nil {
-		logFile := filepath.Join(home, ".awas", "oauth_debug.log")
-		f, _ := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if f != nil {
-			f.WriteString(fmt.Sprintf("[%s] Status: %d, Body: %s\n", time.Now().Format(time.RFC3339), resp.StatusCode, string(bodyBytes)))
-			f.Close()
-		}
 	}
 
 	var errResp struct {

@@ -271,23 +271,34 @@ func detectIndentStyle(content string) string {
 }
 
 func reindentToMatch(s string, targetStyle string) string {
+	if targetStyle == "" {
+		targetStyle = "    "
+	}
+	sourceStyle := detectIndentStyle(s)
+	spacePerLevel := 4
+	if sourceStyle == "  " || (sourceStyle != "    " && targetStyle == "  ") {
+		spacePerLevel = 2
+	}
+
 	lines := strings.Split(s, "\n")
 	var result []string
 	for _, line := range lines {
-		trimmed := strings.TrimLeft(line, " \t")
+		trimmed := strings.TrimLeft(line, " 	")
 		if trimmed == "" {
 			result = append(result, "")
 			continue
 		}
 		leading := line[:len(line)-len(trimmed)]
-		level := 0
+		tabCount := 0
+		spaceCount := 0
 		for _, ch := range leading {
-			if ch == '\t' {
-				level++
-			} else {
-				level++
+			if ch == '	' {
+				tabCount++
+			} else if ch == ' ' {
+				spaceCount++
 			}
 		}
+		level := tabCount + (spaceCount+spacePerLevel/2)/spacePerLevel
 		// Convert to target style
 		newIndent := strings.Repeat(targetStyle, level)
 		result = append(result, newIndent+trimmed)

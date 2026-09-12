@@ -71,7 +71,7 @@ Respond ONLY with a JSON object matching the following structure:
     {
       "id": "step-1",
       "description": "Short explanation of this step",
-      "tool": "The name of the tool to execute. Choose from: read_file, write_to_file, replace_file_content, multi_replace_file_content, execute_command, manage_cron, ask_user, git_ops, lint_and_format, find_files, system_env.",
+      "tool": "The name of the tool to execute. Choose from: read_file, write_file, edit_file, patch_file, execute_command, manage_cron, ask_user, git_ops, lint_and_format, find_files, system_env.",
       "args": { ... arguments for the tool ... },
       "depends_on": []
     }

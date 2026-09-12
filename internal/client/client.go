@@ -212,10 +212,13 @@ type Client struct {
 }
 
 func New(provider LLMProvider) *Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = 60 * time.Second
 	return &Client{
 		provider: provider,
 		httpClient: &http.Client{
-			Timeout: 0,
+			Transport: transport,
+			Timeout:   0,
 		},
 	}
 }
@@ -227,6 +230,9 @@ func (c *Client) resolveEndpoint() string {
 		return url
 	}
 	if strings.HasSuffix(url, "/v1") {
+		return url + "/chat/completions"
+	}
+	if strings.HasSuffix(url, "/openai") {
 		return url + "/chat/completions"
 	}
 	return url + "/v1/chat/completions"

@@ -206,7 +206,8 @@ func KillTask(id string) bool {
 	if ok && t.Cancel != nil {
 		t.Cancel() // Trigger context cancellation
 		if t.Cmd != nil && t.Cmd.Process != nil {
-			t.Cmd.Process.Kill() // Force kill process
+			killProcessGroup(t.Cmd)
+			_ = t.Cmd.Process.Kill() // Force kill process
 		}
 		return true
 	}

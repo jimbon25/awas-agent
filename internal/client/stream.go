@@ -130,6 +130,7 @@ type StreamResult struct {
 	ToolCalls    []ToolCall
 	FinishReason string
 	Usage        *Usage
+	Error        error
 }
 
 func AccumulateStream(sc *StreamController) StreamResult {
@@ -160,6 +161,7 @@ func AccumulateStream(sc *StreamController) StreamResult {
 				ToolCalls:    acc.GetCalls(),
 				FinishReason: finishReason,
 				Usage:        usage,
+				Error:        event.Error,
 			}
 
 		case EventDone:

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -24,6 +25,7 @@ type DiscordUI struct {
 	chainChan  chan bool
 	chainMsgID string
 
+	askMu   sync.Mutex
 	askChan chan string
 
 	planMsgID          string
@@ -61,6 +63,20 @@ func (u *DiscordUI) SendChainResponse(continueChain bool) {
 		default:
 		}
 	}
+}
+
+func (u *DiscordUI) SendAskResponse(answer string) bool {
+	u.askMu.Lock()
+	ch := u.askChan
+	u.askMu.Unlock()
+	if ch != nil {
+		select {
+		case ch <- answer:
+			return true
+		default:
+		}
+	}
+	return false
 }
 
 func (u *DiscordUI) PrintThinking(model string) {
@@ -397,9 +413,9 @@ func renderDiscordAlignedTable(header []string, body [][]string) string {
 		}
 	}
 	widths := make([]int, ncols)
-	for _, c := range header {
-		if len(c) > widths[0] {
-			widths[0] = len(c)
+	for j, c := range header {
+		if len(c) > widths[j] {
+			widths[j] = len(c)
 		}
 	}
 	for i, w := range widths {
@@ -605,13 +621,19 @@ func summarizeArgs(name, args string) string {
 func (u *DiscordUI) AskUser(ctx context.Context, question string) (string, error) {
 	u.session.ChannelMessageSend(u.threadID, fmt.Sprintf("? **Question:** %s\n\n*(Please reply directly in this thread to answer)*", question))
 
-	u.askChan = make(chan string, 1)
+	ch := make(chan string, 1)
+	u.askMu.Lock()
+	u.askChan = ch
+	u.askMu.Unlock()
+
 	defer func() {
+		u.askMu.Lock()
 		u.askChan = nil
+		u.askMu.Unlock()
 	}()
 
 	select {
-	case answer := <-u.askChan:
+	case answer := <-ch:
 		return answer, nil
 	case <-ctx.Done():
 		return "", ctx.Err()

@@ -29,9 +29,10 @@ func (dg *DiscordGateway) OnMessageCreate(s *discordgo.Session, m *discordgo.Mes
 	session, hasSession := dg.users[m.ChannelID]
 	dg.mu.RUnlock()
 	if hasSession && session.Loop.UI != nil {
-		if discUI, ok := session.Loop.UI.(*DiscordUI); ok && discUI.askChan != nil {
-			discUI.askChan <- m.Content
-			return
+		if discUI, ok := session.Loop.UI.(*DiscordUI); ok {
+			if discUI.SendAskResponse(m.Content) {
+				return
+			}
 		}
 	}
 
@@ -480,8 +481,6 @@ func (dg *DiscordGateway) OnInteractionCreate(s *discordgo.Session, i *discordgo
 
 			if p, ok := mgr.Profiles[modelArg]; ok {
 				// Switch profile
-				mgr.ActiveProfile = modelArg
-				mgr.Save()
 				session.Loop.GetConfig().Model = p.Model
 				session.Loop.GetConfig().Endpoint = p.GetEndpoint()
 				session.Loop.GetConfig().APIKey = p.GetAPIKey()
@@ -497,9 +496,9 @@ func (dg *DiscordGateway) OnInteractionCreate(s *discordgo.Session, i *discordgo
 				// Treat as model name
 				session.Loop.GetConfig().Model = modelArg
 				if p, ok := mgr.Profiles[mgr.ActiveProfile]; ok {
-					p.Model = modelArg
-					mgr.Save()
-					session.Loop.SetClient(client.New(p))
+					pCopy := *p
+					pCopy.Model = modelArg
+					session.Loop.SetClient(client.New(&pCopy))
 				}
 				session.SaveSession(dg.cfg)
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -578,8 +577,6 @@ func (dg *DiscordGateway) OnInteractionCreate(s *discordgo.Session, i *discordgo
 				return
 			}
 
-			mgr.ActiveProfile = profileName
-			mgr.Save()
 			session.Loop.GetConfig().Model = p.Model
 			session.Loop.GetConfig().Endpoint = p.GetEndpoint()
 			session.Loop.GetConfig().APIKey = p.GetAPIKey()
@@ -676,9 +673,13 @@ func downloadAttachments(attachments []*discordgo.MessageAttachment, workDir str
 
 	text := originalText
 	for _, att := range attachments {
-		destPath := filepath.Join(downloadsDir, att.Filename)
+		safeName := filepath.Base(filepath.Clean(att.Filename))
+		if safeName == "." || safeName == ".." || safeName == "/" {
+			safeName = "uploaded_file"
+		}
+		destPath := filepath.Join(downloadsDir, safeName)
 		tools.DownloadFile(att.URL, destPath)
-		text = fmt.Sprintf("[System Notification: User uploaded file '%s' and saved to 'downloads/%s']\n%s", att.Filename, att.Filename, text)
+		text = fmt.Sprintf("[System Notification: User uploaded file '%s' and saved to 'downloads/%s']\n%s", safeName, safeName, text)
 	}
 	return text
 }

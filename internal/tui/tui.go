@@ -184,6 +184,7 @@ func saveModelSession(m *Model) {
 		Provider:   activeProfile,
 		Model:      m.Cfg.Model,
 		Mode:       m.Cfg.Mode,
+		AgentMode:  m.Cfg.AgentMode,
 		CreatedAt:  createdAt,
 		Messages:   m.Messages,
 		History:    m.Loop.GetHistory(),

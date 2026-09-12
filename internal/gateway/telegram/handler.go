@@ -53,9 +53,10 @@ func (tg *TelegramGateway) handleMessage(msg *ExtMessage, mgr *gateway.Manager) 
 	session, hasSession := tg.users[key]
 	tg.mu.RUnlock()
 	if hasSession && session.Loop.UI != nil {
-		if telUI, ok := session.Loop.UI.(*TelegramUI); ok && telUI.askChan != nil {
-			telUI.askChan <- text
-			return
+		if telUI, ok := session.Loop.UI.(*TelegramUI); ok {
+			if telUI.SendAskResponse(text) {
+				return
+			}
 		}
 	}
 
@@ -239,8 +240,6 @@ func (tg *TelegramGateway) handleMessage(msg *ExtMessage, mgr *gateway.Manager) 
 		}
 
 		if p, ok := mgr.Profiles[modelArg]; ok {
-			mgr.ActiveProfile = modelArg
-			mgr.Save()
 			session.Loop.GetConfig().Model = p.Model
 			session.Loop.GetConfig().Endpoint = p.GetEndpoint()
 			session.Loop.GetConfig().APIKey = p.GetAPIKey()
@@ -250,9 +249,9 @@ func (tg *TelegramGateway) handleMessage(msg *ExtMessage, mgr *gateway.Manager) 
 		} else {
 			session.Loop.GetConfig().Model = modelArg
 			if p, ok := mgr.Profiles[mgr.ActiveProfile]; ok {
-				p.Model = modelArg
-				mgr.Save()
-				session.Loop.SetClient(client.New(p))
+				pCopy := *p
+				pCopy.Model = modelArg
+				session.Loop.SetClient(client.New(&pCopy))
 			}
 			session.SaveSession(tg.cfg)
 			tg.sendTextToThread(chatID, threadID, fmt.Sprintf("✔ Model changed to: <b>%s</b>", escapeHTML(modelArg)))
@@ -353,10 +352,14 @@ func (tg *TelegramGateway) handleMessage(msg *ExtMessage, mgr *gateway.Manager) 
 		if err == nil {
 			downloadsDir := filepath.Join(session.Loop.GetConfig().WorkDir, "downloads")
 			os.MkdirAll(downloadsDir, 0755)
-			destPath := filepath.Join(downloadsDir, fileName)
+			safeName := filepath.Base(filepath.Clean(fileName))
+			if safeName == "." || safeName == ".." || safeName == "/" {
+				safeName = "uploaded_file"
+			}
+			destPath := filepath.Join(downloadsDir, safeName)
 			tools.DownloadFile(fileURL, destPath)
 
-			text = fmt.Sprintf("[System Notification: User uploaded file '%s' and saved to 'downloads/%s']\n%s", fileName, fileName, text)
+			text = fmt.Sprintf("[System Notification: User uploaded file '%s' and saved to 'downloads/%s']\n%s", safeName, safeName, text)
 		}
 	}
 
@@ -458,8 +461,6 @@ func (tg *TelegramGateway) handleModelSelect(chatID int64, threadID int, profile
 		return
 	}
 
-	mgr.ActiveProfile = profileName
-	mgr.Save()
 	session.Loop.GetConfig().Model = p.Model
 	session.Loop.GetConfig().Endpoint = p.GetEndpoint()
 	session.Loop.GetConfig().APIKey = p.GetAPIKey()

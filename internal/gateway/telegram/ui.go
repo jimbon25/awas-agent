@@ -7,6 +7,7 @@ import (
 	"log"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 	"path/filepath"
 
@@ -51,6 +52,7 @@ type TelegramUI struct {
 	chainChan  chan bool
 	chainMsgID int
 
+	askMu   sync.Mutex
 	askChan chan string
 
 	planMsgID          int
@@ -89,6 +91,20 @@ func (u *TelegramUI) SendChainResponse(continueChain bool) {
 		default:
 		}
 	}
+}
+
+func (u *TelegramUI) SendAskResponse(answer string) bool {
+	u.askMu.Lock()
+	ch := u.askChan
+	u.askMu.Unlock()
+	if ch != nil {
+		select {
+		case ch <- answer:
+			return true
+		default:
+		}
+	}
+	return false
 }
 
 func (u *TelegramUI) startTypingIndicator() {
@@ -488,9 +504,9 @@ func renderAlignedTable(header []string, body [][]string) string {
 		}
 	}
 	widths := make([]int, ncols)
-	for _, c := range header {
-		if len(c) > widths[0] {
-			widths[0] = len(c)
+	for j, c := range header {
+		if len(c) > widths[j] {
+			widths[j] = len(c)
 		}
 	}
 	for i, w := range widths {
@@ -707,13 +723,19 @@ func (u *TelegramUI) AskUser(ctx context.Context, question string) (string, erro
 	msg := tgbotapi.NewMessage(u.chatID, fmt.Sprintf("? **Question:** %s\n\n*(Please reply directly to answer)*", question))
 	sendBot(u.bot, msg, u.threadID)
 
-	u.askChan = make(chan string, 1)
+	u.askMu.Lock()
+	ch := make(chan string, 1)
+	u.askChan = ch
+	u.askMu.Unlock()
+
 	defer func() {
+		u.askMu.Lock()
 		u.askChan = nil
+		u.askMu.Unlock()
 	}()
 
 	select {
-	case answer := <-u.askChan:
+	case answer := <-ch:
 		return answer, nil
 	case <-ctx.Done():
 		return "", ctx.Err()

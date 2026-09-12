@@ -36,6 +36,7 @@ type Session struct {
 	Provider         string
 	Model            string
 	Mode             string
+	AgentMode        string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	Messages         []UIMessage
@@ -98,6 +99,7 @@ func getSessionDB(id string) (*sql.DB, error) {
 		provider         TEXT NOT NULL DEFAULT '',
 		model            TEXT NOT NULL DEFAULT '',
 		mode             TEXT NOT NULL DEFAULT '',
+		agent_mode       TEXT DEFAULT 'simple',
 		created_at       TEXT NOT NULL,
 		updated_at       TEXT NOT NULL,
 		token_count      INTEGER NOT NULL DEFAULT 0,
@@ -138,6 +140,8 @@ func getSessionDB(id string) (*sql.DB, error) {
 		db.Close()
 		return nil, err
 	}
+
+	db.Exec("ALTER TABLE session ADD COLUMN agent_mode TEXT DEFAULT 'simple'")
 
 	sessionDBPoolMu.Lock()
 	sessionDBPool[id] = db
@@ -185,11 +189,16 @@ func SaveSession(s *Session, lastSavedSeq int) error {
 	}
 	defer tx.Rollback()
 
+	agentMode := s.AgentMode
+	if agentMode == "" {
+		agentMode = "simple"
+	}
+
 	_, err = tx.Exec(`
 		INSERT OR REPLACE INTO session 
-		(id, title, workdir, provider, model, mode, created_at, updated_at, token_count, compressed_turns)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		s.ID, s.Title, s.WorkDir, s.Provider, s.Model, s.Mode,
+		(id, title, workdir, provider, model, mode, agent_mode, created_at, updated_at, token_count, compressed_turns)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		s.ID, s.Title, s.WorkDir, s.Provider, s.Model, s.Mode, agentMode,
 		s.CreatedAt.Format(time.RFC3339), s.UpdatedAt.Format(time.RFC3339),
 		s.TokenCount, s.CompressedTurns,
 	)
@@ -265,10 +274,10 @@ func LoadSession(id string) (*Session, error) {
 	var createdAt, updatedAt string
 	err = db.QueryRow(`
 		SELECT id, title, workdir, provider, model, mode, 
-		       created_at, updated_at, token_count, compressed_turns
+		       created_at, updated_at, token_count, compressed_turns, COALESCE(agent_mode, 'simple')
 		FROM session WHERE id = ?`, id,
 	).Scan(&s.ID, &s.Title, &s.WorkDir, &s.Provider, &s.Model, &s.Mode,
-		&createdAt, &updatedAt, &s.TokenCount, &s.CompressedTurns)
+		&createdAt, &updatedAt, &s.TokenCount, &s.CompressedTurns, &s.AgentMode)
 	if err != nil {
 		return nil, err
 	}

@@ -228,7 +228,7 @@ func (l *Loop) RunAgentCycle(ctx context.Context, userInput string) {
 	}
 
 	newHist := SmartCompress(l.history, l.cfg.MaxTokens, l.cfg.KeepLastTurns)
-	if len(newHist) < len(l.history) {
+	if EstimateTotalTokens(newHist) < EstimateTotalTokens(l.history) {
 		l.history = newHist
 		l.UI.PrintCompression(CountTurns(l.history))
 	} else {
@@ -362,7 +362,7 @@ func (l *Loop) RunAgentCycleStream(ctx context.Context, userInput string) {
 	}
 
 	newHist := SmartCompress(l.history, l.cfg.MaxTokens, l.cfg.KeepLastTurns)
-	if len(newHist) < len(l.history) {
+	if EstimateTotalTokens(newHist) < EstimateTotalTokens(l.history) {
 		l.history = newHist
 		l.UI.PrintCompression(CountTurns(l.history))
 	} else {

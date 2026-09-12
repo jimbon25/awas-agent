@@ -5,6 +5,7 @@ import (
 	"awas/internal/session"
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -78,7 +79,10 @@ func (r *SubagentRegistry) emit(event SubagentEvent) {
 func (r *SubagentRegistry) Spawn(parentCtx context.Context, cfg *config.Config, role string, prompt string) (*SubagentInstance, error) {
 	r.mu.Lock()
 	id := fmt.Sprintf("subagent-%d", time.Now().UnixNano()%100000)
-	ctx, cancel := context.WithCancel(parentCtx)
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(context.WithoutCancel(parentCtx))
 
 	instance := &SubagentInstance{
 		ID:        id,
@@ -95,6 +99,11 @@ func (r *SubagentRegistry) Spawn(parentCtx context.Context, cfg *config.Config, 
 
 	go func() {
 		defer cancel()
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[Subagent Panic Recovered] %v", r)
+			}
+		}()
 		loop := NewSubagentLoop(cfg, id)
 		subPrompt := fmt.Sprintf("You are a specialized subagent with role %q.\nTask: %s", role, prompt)
 		
@@ -131,7 +140,8 @@ func (r *SubagentRegistry) List() []*SubagentInstance {
 
 	var list []*SubagentInstance
 	for _, inst := range r.instances {
-		list = append(list, inst)
+		cp := *inst
+		list = append(list, &cp)
 	}
 	return list
 }
@@ -141,7 +151,11 @@ func (r *SubagentRegistry) Get(id string) (*SubagentInstance, bool) {
 	defer r.mu.RUnlock()
 
 	inst, ok := r.instances[id]
-	return inst, ok
+	if !ok {
+		return nil, false
+	}
+	cp := *inst
+	return &cp, true
 }
 
 func (r *SubagentRegistry) UpdateStep(id string, step string) {

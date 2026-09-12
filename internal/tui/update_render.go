@@ -278,7 +278,10 @@ func updateViewportContent(m *Model) {
 	if !m.UserScrolledUp {
 		m.Viewport.GotoBottom()
 	}
-	saveModelSession(m) 
+	// ponytail: only save when not streaming and session has new messages to avoid blocking UI frames
+	if !m.IsStreaming && len(m.Messages) > 0 && len(m.Messages)-1 != m.LastSavedSeq {
+		saveModelSession(m)
+	}
 }
 
 func generateSessionTitle(m *Model) {

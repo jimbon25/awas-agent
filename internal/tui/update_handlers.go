@@ -127,8 +127,8 @@ func handleAgentMessage(m *Model, msg tea.Msg) (tea.Cmd, bool) {
 	case AgentMessageDeltaMsg:
 		if len(m.Messages) > 0 && m.Messages[len(m.Messages)-1].Role == "assistant" {
 			lastIdx := len(m.Messages) - 1
+			delete(m.RenderedLines, msgCacheKey(m.Messages[lastIdx], m.ExpandedTools[lastIdx]))
 			m.Messages[lastIdx].Content += msg.Content
-			delete(m.RenderedLines, lastIdx) 
 		} else {
 			m.Messages = append(m.Messages, UIMessage{
 				Role:    "assistant",
@@ -148,8 +148,8 @@ func handleAgentMessage(m *Model, msg tea.Msg) (tea.Cmd, bool) {
 
 			chunk := string(m.TypewriterRunes[m.TypewriterIndex:nextIdx])
 			if m.TypewriterMsgIndex >= 0 && m.TypewriterMsgIndex < len(m.Messages) {
+				delete(m.RenderedLines, msgCacheKey(m.Messages[m.TypewriterMsgIndex], m.ExpandedTools[m.TypewriterMsgIndex]))
 				m.Messages[m.TypewriterMsgIndex].Content += chunk
-				delete(m.RenderedLines, m.TypewriterMsgIndex)
 			}
 			m.TypewriterIndex = nextIdx
 			updateViewportContent(m)
