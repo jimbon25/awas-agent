@@ -238,10 +238,52 @@ func (c *Client) resolveEndpoint() string {
 	return url + "/v1/chat/completions"
 }
 
+// SanitizeMessages cleans up message history to satisfy strict turn-order requirements
+// (e.g. Google Gemini / Anthropic / OpenAI endpoints). It filters out empty turns
+// and guarantees the messages array does not end with trailing assistant/system messages.
+func SanitizeMessages(messages []Message) []Message {
+	if len(messages) == 0 {
+		return messages
+	}
+
+	cleaned := make([]Message, 0, len(messages))
+	for _, m := range messages {
+		// Drop empty user messages (no content and no tool results)
+		if m.Role == "user" && strings.TrimSpace(m.Content) == "" {
+			continue
+		}
+		// Drop empty assistant messages with no tool calls and no content
+		if m.Role == "assistant" && strings.TrimSpace(m.Content) == "" && len(m.ToolCalls) == 0 {
+			continue
+		}
+		cleaned = append(cleaned, m)
+	}
+
+	if len(cleaned) == 0 {
+		return messages
+	}
+
+	// Ensure the request does not end with a model/assistant turn or trailing system nudge
+	for len(cleaned) > 0 {
+		last := cleaned[len(cleaned)-1]
+		if last.Role == "assistant" || (last.Role == "system" && len(cleaned) > 1) {
+			cleaned = cleaned[:len(cleaned)-1]
+		} else {
+			break
+		}
+	}
+
+	if len(cleaned) == 0 {
+		return messages
+	}
+
+	return cleaned
+}
+
 func (c *Client) Send(ctx context.Context, messages []Message, tools []Tool) (*Choice, *Usage, error) {
 	reqBody := ChatRequest{
 		Model:    c.provider.GetModel(),
-		Messages: messages,
+		Messages: SanitizeMessages(messages),
 		Tools:    tools,
 		Stream:   false,
 	}
@@ -297,7 +339,7 @@ func (c *Client) Send(ctx context.Context, messages []Message, tools []Tool) (*C
 func (c *Client) SendStream(ctx context.Context, messages []Message, tools []Tool) (*StreamController, error) {
 	reqBody := ChatRequest{
 		Model:    c.provider.GetModel(),
-		Messages: messages,
+		Messages: SanitizeMessages(messages),
 		Tools:    tools,
 		Stream:   true,
 	}

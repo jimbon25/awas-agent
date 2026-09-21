@@ -135,6 +135,13 @@ func (dg *DiscordGateway) OnMessageCreate(s *discordgo.Session, m *discordgo.Mes
 			return
 		}
 
+		if cleanContent == "" && len(m.Attachments) == 0 {
+			if hasMention {
+				s.ChannelMessageSend(m.ChannelID, "👋 Ada yang bisa saya bantu? Silakan ketik pesan atau perintah kamu.")
+			}
+			return
+		}
+
 		session := dg.getSession(m.ChannelID, m.Author.Username, mgr)
 		if session == nil {
 			s.ChannelMessageSend(m.ChannelID, "✘ Access denied or max active sessions reached.")
@@ -147,7 +154,7 @@ func (dg *DiscordGateway) OnMessageCreate(s *discordgo.Session, m *discordgo.Mes
 		ch := dg.msgChs[m.ChannelID]
 		dg.mu.Unlock()
 
-		text := downloadAttachments(m.Attachments, session.Loop.GetConfig().WorkDir, m.Content)
+		text := downloadAttachments(m.Attachments, session.Loop.GetConfig().WorkDir, cleanContent)
 
 		select {
 		case ch <- pendingMsg{text: text, ui: ui}:

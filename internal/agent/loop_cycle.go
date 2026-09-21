@@ -10,10 +10,9 @@ import (
 
 func (l *Loop) RunAgentCycle(ctx context.Context, userInput string) {
 	InvalidateSkillsCache()
-	l.history = append(l.history, client.Message{
-		Role:    "user",
-		Content: userInput,
-	})
+	if strings.TrimSpace(userInput) == "" {
+		return
+	}
 
 	l.TurnCount++
 	interval := l.cfg.NudgeInterval
@@ -26,6 +25,11 @@ func (l *Loop) RunAgentCycle(ctx context.Context, userInput string) {
 			Content: "[System Nudge: Please review the recent conversation turns. If the user provided new preferences, corrections, feedback, or there are new environment facts, use the 'manage_memory' tool to update USER.md or MEMORY.md before answering. If no updates are needed, proceed normally.]",
 		})
 	}
+
+	l.history = append(l.history, client.Message{
+		Role:    "user",
+		Content: userInput,
+	})
 
 	if l.cfg.AgentMode == "planned" || l.cfg.AgentMode == "deep" {
 		l.UI.PrintMessage("system", "⎔ Planning execution phase started...")
@@ -242,15 +246,14 @@ func (l *Loop) RunAgentCycle(ctx context.Context, userInput string) {
 
 func (l *Loop) RunAgentCycleStream(ctx context.Context, userInput string) {
 	InvalidateSkillsCache()
+	if strings.TrimSpace(userInput) == "" {
+		return
+	}
+
 	if l.cfg.AgentMode == "planned" || l.cfg.AgentMode == "deep" {
 		l.RunAgentCycle(ctx, userInput)
 		return
 	}
-
-	l.history = append(l.history, client.Message{
-		Role:    "user",
-		Content: userInput,
-	})
 
 	l.TurnCount++
 	interval := l.cfg.NudgeInterval
@@ -263,6 +266,11 @@ func (l *Loop) RunAgentCycleStream(ctx context.Context, userInput string) {
 			Content: "[System Nudge: Please review the recent conversation turns. If the user provided new preferences, corrections, feedback, or there are new environment facts, use the 'manage_memory' tool to update USER.md or MEMORY.md before answering. If no updates are needed, proceed normally.]",
 		})
 	}
+
+	l.history = append(l.history, client.Message{
+		Role:    "user",
+		Content: userInput,
+	})
 
 	toolChainCount := 0
 
