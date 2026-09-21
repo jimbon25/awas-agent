@@ -130,11 +130,6 @@ func (dg *DiscordGateway) OnMessageCreate(s *discordgo.Session, m *discordgo.Mes
 	}
 
 	if isThread {
-		isAwasThread := channel.OwnerID == s.State.User.ID || strings.HasPrefix(channel.Name, "awas-")
-		if !isAwasThread && !hasMention {
-			return
-		}
-
 		if cleanContent == "" && len(m.Attachments) == 0 {
 			if hasMention {
 				s.ChannelMessageSend(m.ChannelID, "👋 Ada yang bisa saya bantu? Silakan ketik pesan atau perintah kamu.")
@@ -163,26 +158,37 @@ func (dg *DiscordGateway) OnMessageCreate(s *discordgo.Session, m *discordgo.Mes
 		}
 
 	} else {
-
-		hasMention := false
-		for _, mention := range m.Mentions {
-			if mention.ID == s.State.User.ID {
-				hasMention = true
-				break
-			}
-		}
-
-		if !hasMention {
+		if allowedChannelID == "" && !hasMention {
 			return
 		}
 
-		cleanContent := m.Content
-		cleanContent = strings.ReplaceAll(cleanContent, botMention, "")
-		cleanContent = strings.ReplaceAll(cleanContent, botMentionNickname, "")
-		cleanContent = strings.TrimSpace(cleanContent)
+		if cleanContent == "" && len(m.Attachments) == 0 {
+			if hasMention {
+				s.ChannelMessageSend(m.ChannelID, "👋 Halo! Silakan ketik pesan atau pertanyaan kamu.")
+			}
+			return
+		}
 
-		if cleanContent == "" {
-			s.ChannelMessageSend(m.ChannelID, "👋 Hello! Mention me followed by your message to start a new session inside a thread.")
+		if allowedChannelID != "" {
+			session := dg.getSession(m.ChannelID, m.Author.Username, mgr)
+			if session == nil {
+				s.ChannelMessageSend(m.ChannelID, "✘ Access denied or max active sessions reached.")
+				return
+			}
+
+			ui := NewDiscordUI(s, m.ChannelID, dg)
+			dg.mu.Lock()
+			dg.ensureProcessor(m.ChannelID, session)
+			ch := dg.msgChs[m.ChannelID]
+			dg.mu.Unlock()
+
+			text := downloadAttachments(m.Attachments, session.Loop.GetConfig().WorkDir, cleanContent)
+
+			select {
+			case ch <- pendingMsg{text: text, ui: ui}:
+			default:
+				s.ChannelMessageSend(m.ChannelID, "⧗ Still processing previous command. Please wait...")
+			}
 			return
 		}
 
