@@ -6,11 +6,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
-func DownloadFile(fileURL, destPath string) string {
+func DownloadFile(workDir, fileURL, destPath string) string {
 	if fileURL == "" {
 		return "[Error] url is required"
 	}
@@ -18,10 +17,15 @@ func DownloadFile(fileURL, destPath string) string {
 		return "[Error] path is required"
 	}
 
-	destPath = filepath.Clean(destPath)
-	if destPath == "." || destPath == ".." || strings.HasPrefix(destPath, ".."+string(filepath.Separator)) || strings.HasPrefix(filepath.ToSlash(destPath), "../") {
-		return "[Error] relative path traversal detected in destination path"
+	if workDir == "" {
+		workDir = "."
 	}
+
+	absPath, err := resolvePath(workDir, destPath)
+	if err != nil {
+		return fmt.Sprintf("[Error] %v", err)
+	}
+	destPath = absPath
 
 	dir := filepath.Dir(destPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {

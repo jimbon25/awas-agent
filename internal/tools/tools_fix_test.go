@@ -66,27 +66,30 @@ func TestReindentToMatch(t *testing.T) {
 }
 
 func TestDownloadFileValidation(t *testing.T) {
-	// Relative path traversal attempts should fail
+	workDir := t.TempDir()
+
+	// Relative and absolute path traversal attempts should fail
 	traversalPaths := []string{
 		"../escape.txt",
 		"../../etc/passwd",
 		"foo/../../escape.txt",
 		"..",
-		".",
+		"/etc/passwd",
+		"/tmp/some_absolute_escape.txt",
 	}
 
 	for _, p := range traversalPaths {
-		res := DownloadFile("http://example.com/test.zip", p)
+		res := DownloadFile(workDir, "http://example.com/test.zip", p)
 		if !strings.HasPrefix(res, "[Error]") {
 			t.Errorf("expected error for traversal path %q, got: %s", p, res)
 		}
 	}
 
 	// Empty checks
-	if res := DownloadFile("", "valid.txt"); !strings.Contains(res, "url is required") {
+	if res := DownloadFile(workDir, "", "valid.txt"); !strings.Contains(res, "url is required") {
 		t.Errorf("expected url required error, got: %s", res)
 	}
-	if res := DownloadFile("http://example.com/test.zip", ""); !strings.Contains(res, "path is required") {
+	if res := DownloadFile(workDir, "http://example.com/test.zip", ""); !strings.Contains(res, "path is required") {
 		t.Errorf("expected path required error, got: %s", res)
 	}
 }

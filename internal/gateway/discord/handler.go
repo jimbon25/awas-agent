@@ -20,8 +20,24 @@ func (dg *DiscordGateway) OnReady(s *discordgo.Session, r *discordgo.Ready) {
 	log.Printf("[discord] Bot logged in as: %s#%s", r.User.Username, r.User.Discriminator)
 }
 
+func (dg *DiscordGateway) isUserAllowed(userID string) bool {
+	if len(dg.config.AllowedUsers) == 0 {
+		return true
+	}
+	for _, id := range dg.config.AllowedUsers {
+		if id == userID {
+			return true
+		}
+	}
+	return false
+}
+
 func (dg *DiscordGateway) OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate, mgr *gateway.Manager) {
-	if m.Author.ID == s.State.User.ID {
+	if m.Author == nil || m.Author.Bot || m.Author.ID == s.State.User.ID {
+		return
+	}
+
+	if !dg.isUserAllowed(m.Author.ID) {
 		return
 	}
 
@@ -37,8 +53,10 @@ func (dg *DiscordGateway) OnMessageCreate(s *discordgo.Session, m *discordgo.Mes
 	}
 
 	guildID := ""
+	allowedChannelID := ""
 	if dg.config.Extra != nil {
 		guildID = dg.config.Extra["guild_id"]
+		allowedChannelID = dg.config.Extra["channel_id"]
 	}
 	if guildID != "" && m.GuildID != guildID {
 		return
@@ -57,8 +75,28 @@ func (dg *DiscordGateway) OnMessageCreate(s *discordgo.Session, m *discordgo.Mes
 		channel.Type == discordgo.ChannelTypeGuildPrivateThread ||
 		channel.Type == discordgo.ChannelTypeGuildNewsThread
 
+	if allowedChannelID != "" {
+		if isThread {
+			if channel.ParentID != allowedChannelID {
+				return
+			}
+		} else {
+			if channel.ID != allowedChannelID {
+				return
+			}
+		}
+	}
+
 	botMention := fmt.Sprintf("<@%s>", s.State.User.ID)
 	botMentionNickname := fmt.Sprintf("<@!%s>", s.State.User.ID)
+
+	hasMention := false
+	for _, mention := range m.Mentions {
+		if mention.ID == s.State.User.ID {
+			hasMention = true
+			break
+		}
+	}
 
 	cleanContent := strings.TrimSpace(m.Content)
 	cleanContent = strings.ReplaceAll(cleanContent, botMention, "")
@@ -73,17 +111,8 @@ func (dg *DiscordGateway) OnMessageCreate(s *discordgo.Session, m *discordgo.Mes
 		strings.HasPrefix(strings.ToLower(cleanContent), "tambahkan cron")
 
 	if isCronTrigger {
-		if !isThread {
-			hasMention := false
-			for _, mention := range m.Mentions {
-				if mention.ID == s.State.User.ID {
-					hasMention = true
-					break
-				}
-			}
-			if !hasMention {
-				return
-			}
+		if !isThread && !hasMention {
+			return
 		}
 
 		var args []string
@@ -101,6 +130,11 @@ func (dg *DiscordGateway) OnMessageCreate(s *discordgo.Session, m *discordgo.Mes
 	}
 
 	if isThread {
+		isAwasThread := channel.OwnerID == s.State.User.ID || strings.HasPrefix(channel.Name, "awas-")
+		if !isAwasThread && !hasMention {
+			return
+		}
+
 		session := dg.getSession(m.ChannelID, m.Author.Username, mgr)
 		if session == nil {
 			s.ChannelMessageSend(m.ChannelID, "✘ Access denied or max active sessions reached.")
@@ -192,6 +226,24 @@ func (dg *DiscordGateway) OnInteractionCreate(s *discordgo.Session, i *discordgo
 		guildID = dg.config.Extra["guild_id"]
 	}
 	if guildID != "" && i.GuildID != guildID {
+		return
+	}
+
+	var userID string
+	if i.Member != nil && i.Member.User != nil {
+		userID = i.Member.User.ID
+	} else if i.User != nil {
+		userID = i.User.ID
+	}
+
+	if !dg.isUserAllowed(userID) {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "⚠ Access denied.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
 		return
 	}
 
@@ -678,7 +730,7 @@ func downloadAttachments(attachments []*discordgo.MessageAttachment, workDir str
 			safeName = "uploaded_file"
 		}
 		destPath := filepath.Join(downloadsDir, safeName)
-		tools.DownloadFile(att.URL, destPath)
+		tools.DownloadFile(workDir, att.URL, destPath)
 		text = fmt.Sprintf("[System Notification: User uploaded file '%s' and saved to 'downloads/%s']\n%s", safeName, safeName, text)
 	}
 	return text

@@ -100,8 +100,16 @@ func (r *SubagentRegistry) Spawn(parentCtx context.Context, cfg *config.Config, 
 	go func() {
 		defer cancel()
 		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("[Subagent Panic Recovered] %v", r)
+			if rec := recover(); rec != nil {
+				log.Printf("[Subagent Panic Recovered] %v", rec)
+				r.mu.Lock()
+				instance.EndTime = time.Now()
+				instance.Status = SubagentStatusFailed
+				instance.Error = fmt.Sprintf("panic: %v", rec)
+				r.mu.Unlock()
+
+				r.emit(SubagentEvent{Type: "finished", Instance: instance})
+				_ = session.Default().SaveSubagentLog("global", instance.ID, instance.Role, instance.Prompt, string(instance.Status), instance.Error, instance.StartTime, instance.EndTime)
 			}
 		}()
 		loop := NewSubagentLoop(cfg, id)

@@ -157,7 +157,7 @@ func (l *Loop) executeTool(ctx context.Context, toolCall client.ToolCall) string
 	case "download_file":
 		dlURL, _ := args["url"].(string)
 		path, _ := args["path"].(string)
-		result = tools.DownloadFile(dlURL, path)
+		result = tools.DownloadFile(l.cfg.WorkDir, dlURL, path)
 	case "web_fetch":
 		url, _ := args["url"].(string)
 		result = tools.WebFetch(url)

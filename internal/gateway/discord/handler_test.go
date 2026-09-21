@@ -43,8 +43,10 @@ func TestOnMessageCreate(t *testing.T) {
 				Type: discordgo.ChannelTypeGuildText,
 			},
 			{
-				ID:   "thread-789",
-				Type: discordgo.ChannelTypeGuildPublicThread,
+				ID:      "thread-789",
+				Name:    "awas-test-thread",
+				OwnerID: "bot-user-123",
+				Type:    discordgo.ChannelTypeGuildPublicThread,
 			},
 		},
 	}

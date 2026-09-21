@@ -48,6 +48,15 @@ func (tg *TelegramGateway) handleMessage(msg *ExtMessage, mgr *gateway.Manager) 
 		return
 	}
 
+	var userID int64
+	if msg.From != nil {
+		userID = msg.From.ID
+	}
+	if !tg.isUserAllowed(userID, chatID) {
+		tg.sendTextToThread(chatID, threadID, "⚠ Access denied.")
+		return
+	}
+
 	key := fmt.Sprintf("%d:%d", chatID, threadID)
 	tg.mu.RLock()
 	session, hasSession := tg.users[key]
@@ -357,7 +366,7 @@ func (tg *TelegramGateway) handleMessage(msg *ExtMessage, mgr *gateway.Manager) 
 				safeName = "uploaded_file"
 			}
 			destPath := filepath.Join(downloadsDir, safeName)
-			tools.DownloadFile(fileURL, destPath)
+			tools.DownloadFile(session.Loop.GetConfig().WorkDir, fileURL, destPath)
 
 			text = fmt.Sprintf("[System Notification: User uploaded file '%s' and saved to 'downloads/%s']\n%s", safeName, safeName, text)
 		}
@@ -391,6 +400,14 @@ func (tg *TelegramGateway) handleCallbackQuery(query *ExtCallbackQuery, mgr *gat
 	data := query.Data
 	chatID := query.Message.Chat.ID
 	threadID := query.Message.MessageThreadID
+
+	var userID int64
+	if query.From != nil {
+		userID = query.From.ID
+	}
+	if !tg.isUserAllowed(userID, chatID) {
+		return
+	}
 
 	callback := tgbotapi.NewCallback(query.ID, "")
 	bot.Request(callback)

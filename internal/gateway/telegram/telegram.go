@@ -120,7 +120,21 @@ func (tg *TelegramGateway) getBot() *tgbotapi.BotAPI {
 }
 
 func (tg *TelegramGateway) SendText(chatID int64, text string) {
-	tg.sendTextToThread(chatID, 0, text)
+	tg.SendTextToThread(chatID, 0, text)
+}
+
+func (tg *TelegramGateway) isUserAllowed(userID int64, chatID int64) bool {
+	if len(tg.config.AllowedUsers) == 0 {
+		return true
+	}
+	userStr := fmt.Sprintf("%d", userID)
+	chatStr := fmt.Sprintf("%d", chatID)
+	for _, id := range tg.config.AllowedUsers {
+		if id == userStr || id == chatStr {
+			return true
+		}
+	}
+	return false
 }
 
 func (tg *TelegramGateway) getSession(chatID int64, threadID int, displayName string, mgr *gateway.Manager) *gateway.UserSession {
@@ -273,7 +287,7 @@ func (tg *TelegramGateway) registerCommands() {
 	sendBot(bot, config)
 }
 
-func (tg *TelegramGateway) sendTextToThread(chatID int64, threadID int, text string) {
+func (tg *TelegramGateway) SendTextToThread(chatID int64, threadID int, text string) {
 	bot := tg.getBot()
 	if bot == nil {
 		return
@@ -281,6 +295,10 @@ func (tg *TelegramGateway) sendTextToThread(chatID int64, threadID int, text str
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "HTML"
 	sendBot(bot, msg, threadID)
+}
+
+func (tg *TelegramGateway) sendTextToThread(chatID int64, threadID int, text string) {
+	tg.SendTextToThread(chatID, threadID, text)
 }
 
 func cleanThreadTitle(rawText string) string {
